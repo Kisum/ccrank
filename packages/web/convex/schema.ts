@@ -15,7 +15,9 @@ export default defineSchema({
   // Daily usage statistics for each user
   dailyStats: defineTable({
     userId: v.id("users"),
-    date: v.string(), // YYYY-MM-DD format
+    date: v.string(), // YYYY-MM-DD format (user's local timezone, for display)
+    utcDate: v.optional(v.string()), // YYYY-MM-DD format (UTC, for accurate comparisons)
+    timezoneOffset: v.optional(v.number()), // Minutes offset from UTC (e.g., -480 for PST)
     inputTokens: v.number(),
     outputTokens: v.number(),
     cacheCreationTokens: v.number(),
@@ -26,7 +28,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_date", ["userId", "date"])
+    .index("by_user_utc_date", ["userId", "utcDate"])
     .index("by_date", ["date"])
+    .index("by_utc_date", ["utcDate"])
     .index("by_user", ["userId"]),
 
   // API keys for CLI authentication

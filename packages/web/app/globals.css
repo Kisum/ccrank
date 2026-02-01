@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #e5e7eb;
-  --card-bg: #111118;
-  --card-border: #1f1f2e;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --muted: #6b7280;
-  --success: #22c55e;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card-bg: #f5f5f5;
+  --card-border: #e0e0e0;
+  --accent: #CCFF6F;
+  --accent-hover: #b8e65f;
+  --muted: #666666;
+  --success: #CCFF6F;
 }
 
 @theme inline {
@@ -29,7 +29,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -51,19 +51,15 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--card-border);
-  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
-/* Gradient text utility */
+/* Primary text utility */
 .gradient-text {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #000000;
 }
 
 /* Card hover effect */
@@ -72,24 +68,14 @@ body {
 }
 
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.1);
+  background-color: #CCFF6F;
 }
 
 /* Tab animation */
 .tab-active {
   position: relative;
-}
-
-.tab-active::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #6366f1, #a855f7);
-  border-radius: 2px 2px 0 0;
+  background-color: #CCFF6F !important;
+  color: #000000 !important;
 }
 
 /* Loading pulse */

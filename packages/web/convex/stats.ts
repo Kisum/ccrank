@@ -112,7 +112,9 @@ export const batchRecordStats = mutation({
     userId: v.id("users"),
     stats: v.array(
       v.object({
-        date: v.string(),
+        date: v.string(), // User's local date (YYYY-MM-DD)
+        utcDate: v.optional(v.string()), // UTC date (YYYY-MM-DD)
+        timezoneOffset: v.optional(v.number()), // Minutes offset from UTC
         inputTokens: v.number(),
         outputTokens: v.number(),
         cacheCreationTokens: v.number(),
@@ -146,6 +148,9 @@ export const batchRecordStats = mutation({
           totalTokens: stat.totalTokens,
           totalCost: stat.totalCost,
           modelsUsed: stat.modelsUsed,
+          // Update UTC fields if provided (may be missing for legacy data)
+          ...(stat.utcDate && { utcDate: stat.utcDate }),
+          ...(stat.timezoneOffset !== undefined && { timezoneOffset: stat.timezoneOffset }),
           updatedAt: now,
         });
         results.push(`updated:${stat.date}`);
@@ -154,6 +159,8 @@ export const batchRecordStats = mutation({
         await ctx.db.insert("dailyStats", {
           userId: args.userId,
           date: stat.date,
+          utcDate: stat.utcDate, // May be undefined for legacy data
+          timezoneOffset: stat.timezoneOffset, // May be undefined for legacy data
           inputTokens: stat.inputTokens,
           outputTokens: stat.outputTokens,
           cacheCreationTokens: stat.cacheCreationTokens,

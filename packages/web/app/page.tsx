@@ -55,32 +55,19 @@ export default function Home() {
       <header className="sticky top-0 z-10 bg-[#0a0a0f]/80 backdrop-blur-md border-b border-[#1f1f2e]">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold gradient-text">rye</h1>
-              <p className="text-xs text-gray-500">Claude Code Usage Leaderboard</p>
-            </div>
+            <img
+              src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
+              alt="Rye logo"
+              className="w-10 h-10 rounded-xl"
+            />
+            <h1 className="text-xl font-bold gradient-text">Rye Claude Code Usage Leaderboard</h1>
           </div>
 
           <a
             href="/setup"
             className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-[#1a1a24] hover:bg-[#242432] border border-[#2a2a3e] rounded-lg transition-colors"
           >
-            Setup
+            Sync your usage
           </a>
         </div>
       </header>
@@ -130,11 +117,14 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-[#1f1f2e] py-6">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center">
-          <p className="text-sm text-gray-500">
-            Powered by{" "}
-            <span className="font-semibold gradient-text">rye</span>
-          </p>
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
+          <p className="text-sm text-gray-500">Powered by</p>
+          <img
+            src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
+            alt="Rye logo"
+            className="w-5 h-5 rounded"
+          />
+          <span className="text-sm font-semibold gradient-text">Rye</span>
         </div>
       </footer>
     </div>

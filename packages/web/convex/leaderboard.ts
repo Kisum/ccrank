@@ -17,27 +17,32 @@ type LeaderboardEntry = {
   rank: number;
 };
 
-// Helper to get today's date in YYYY-MM-DD format
+// Helper to get today's date in YYYY-MM-DD format (UTC)
 function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-// Helper to get start of current week (Monday)
+// Helper to get start of current week (Monday) in UTC
 function getWeekStart(): string {
   const now = new Date();
-  const dayOfWeek = now.getDay();
+  const dayOfWeek = now.getUTCDay();
   const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust so Monday is start
   const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
+  monday.setUTCDate(now.getUTCDate() - diff);
   return monday.toISOString().split("T")[0];
 }
 
-// Helper to get start of current month
+// Helper to get start of current month in UTC
 function getMonthStart(): string {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1)
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     .toISOString()
     .split("T")[0];
+}
+
+// Helper to get the effective date for filtering (prefer utcDate, fallback to date)
+function getEffectiveDate(stat: Doc<"dailyStats">): string {
+  return stat.utcDate ?? stat.date;
 }
 
 // Helper to aggregate stats and build leaderboard
@@ -50,10 +55,11 @@ async function buildLeaderboard(
   // Get all daily stats in the date range
   const allStats = await ctx.db.query("dailyStats").collect();
 
-  // Filter by date range
-  const filteredStats = allStats.filter(
-    (s: Doc<"dailyStats">) => s.date >= startDate && s.date <= endDate
-  );
+  // Filter by date range using UTC date when available (for accurate cross-timezone comparisons)
+  const filteredStats = allStats.filter((s: Doc<"dailyStats">) => {
+    const effectiveDate = getEffectiveDate(s);
+    return effectiveDate >= startDate && effectiveDate <= endDate;
+  });
 
   // Group stats by userId and aggregate
   const userAggregates = new Map<
@@ -132,6 +138,7 @@ async function buildLeaderboard(
 
 /**
  * Get today's leaderboard.
+ * Uses UTC date for accurate cross-timezone comparisons.
  */
 export const getDailyLeaderboard = query({
   args: {
@@ -352,10 +359,11 @@ export const getStatsSummary = query({
     // Get all daily stats in the date range
     const allStats = await ctx.db.query("dailyStats").collect();
 
-    // Filter by date range
-    const filteredStats = allStats.filter(
-      (s: Doc<"dailyStats">) => s.date >= startDate && s.date <= today
-    );
+    // Filter by date range using UTC date when available
+    const filteredStats = allStats.filter((s: Doc<"dailyStats">) => {
+      const effectiveDate = getEffectiveDate(s);
+      return effectiveDate >= startDate && effectiveDate <= today;
+    });
 
     // Calculate totals
     let totalTokens = 0;

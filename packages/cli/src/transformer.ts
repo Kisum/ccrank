@@ -5,15 +5,32 @@
 import { CCUsageOutput, LeaderboardEntry } from './types';
 
 /**
+ * Convert a local date string (YYYY-MM-DD) to UTC date string
+ * accounting for the current timezone offset.
+ */
+function localDateToUtcDate(localDate: string): string {
+  // Parse the local date and add current time
+  const [year, month, day] = localDate.split('-').map(Number);
+  // Create date at noon local time to avoid DST edge cases
+  const localDateTime = new Date(year, month - 1, day, 12, 0, 0);
+  // Convert to UTC date string
+  return localDateTime.toISOString().split('T')[0];
+}
+
+/**
  * Transform ccusage daily data into leaderboard entries
  */
 export function transformToLeaderboardEntries(
   ccusageData: CCUsageOutput,
   username: string
 ): LeaderboardEntry[] {
+  const timezoneOffset = new Date().getTimezoneOffset(); // Minutes offset from UTC
+
   return ccusageData.daily.map(day => ({
     username,
-    date: day.date,
+    date: day.date, // Keep original local date for display
+    utcDate: localDateToUtcDate(day.date), // Add UTC date for accurate comparisons
+    timezoneOffset,
     totalTokens: day.totalTokens,
     totalCost: day.totalCost,
     inputTokens: day.inputTokens,

@@ -44,7 +44,9 @@ export interface Config {
 
 export interface LeaderboardEntry {
   username: string;
-  date: string;
+  date: string; // User's local date (YYYY-MM-DD)
+  utcDate: string; // UTC date (YYYY-MM-DD) for accurate cross-timezone comparisons
+  timezoneOffset: number; // Minutes offset from UTC (e.g., -480 for PST)
   totalTokens: number;
   totalCost: number;
   inputTokens: number;

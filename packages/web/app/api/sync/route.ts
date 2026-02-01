@@ -4,7 +4,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
 interface StatsEntry {
-  date: string;
+  date: string; // User's local date (YYYY-MM-DD)
+  utcDate?: string; // UTC date (YYYY-MM-DD) for accurate comparisons
+  timezoneOffset?: number; // Minutes offset from UTC
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens: number;
@@ -88,6 +90,8 @@ export async function POST(request: NextRequest) {
     // Format entries for the Convex mutation
     const statsEntries = entries.map((entry) => ({
       date: entry.date,
+      utcDate: entry.utcDate, // May be undefined for legacy data
+      timezoneOffset: entry.timezoneOffset, // May be undefined for legacy data
       inputTokens: entry.inputTokens || 0,
       outputTokens: entry.outputTokens || 0,
       cacheCreationTokens: entry.cacheCreationTokens || 0,
