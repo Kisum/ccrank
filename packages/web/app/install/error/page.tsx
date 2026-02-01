@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Link from "next/link";
 
 function ErrorContent() {
   const searchParams = useSearchParams();
@@ -42,12 +43,12 @@ function ErrorContent() {
             >
               Try Again
             </a>
-            <a
+            <Link
               href="/"
               className="inline-flex items-center justify-center w-full px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
             >
               Back to Home
-            </a>
+            </Link>
           </div>
         </div>
       </div>

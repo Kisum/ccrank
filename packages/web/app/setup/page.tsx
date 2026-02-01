@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useSession, signIn } from "next-auth/react";
+import Link from "next/link";
 
 export default function SetupPage() {
   const { data: session, status } = useSession();
   const [copied, setCopied] = useState(false);
 
-  const username = (session?.user as any)?.username || session?.user?.name || "";
+  const user = session?.user as { username?: string; name?: string | null; image?: string | null } | undefined;
+  const username = user?.username || user?.name || "";
 
   const getCommand = () => {
     return `ccusage --json | curl -s -X POST "https://ccusageshare-leaderboard.vercel.app/api/sync?user=${encodeURIComponent(username)}" -H "Content-Type: application/json" -d @-`;
@@ -82,12 +84,12 @@ export default function SetupPage() {
             </div>
 
             <div className="mt-6 pt-4 border-t border-[#2a2a3e]">
-              <a
+              <Link
                 href="/"
                 className="text-indigo-400 hover:text-indigo-300 text-sm"
               >
                 ← Back to Leaderboard
-              </a>
+              </Link>
             </div>
           </div>
         )}
