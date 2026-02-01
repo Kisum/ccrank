@@ -114,7 +114,7 @@ function installClaudeHook(): { installed: boolean; alreadyExists: boolean } {
   }
 
   // Check if hook already exists
-  const hookCommand = 'npx ccrank sync --quiet';
+  const hookCommand = 'npx github:Kisum/ccrank sync --quiet';
   const existingHook = settings.hooks.SessionEnd.find(
     hook => hook.command === hookCommand
   );
