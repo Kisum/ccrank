@@ -109,9 +109,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${entries.length} entries for ${username}`,
-      count: entries.length,
-      results: result.results,
+      message: `Synced ${result.inserted} entries for ${username} (replaced ${result.deleted} existing)`,
+      count: result.inserted,
+      deleted: result.deleted,
     });
   } catch (error) {
     console.error("Sync error:", error);

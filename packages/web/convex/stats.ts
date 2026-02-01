@@ -105,7 +105,8 @@ export const getStatsByDate = query({
 
 /**
  * Batch record stats for multiple days.
- * Useful for syncing historical data.
+ * Deletes all existing stats for the user and replaces with new data.
+ * This ensures the database always mirrors the user's local data exactly.
  */
 export const batchRecordStats = mutation({
   args: {
@@ -126,55 +127,73 @@ export const batchRecordStats = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const results: string[] = [];
     const now = Date.now();
 
-    for (const stat of args.stats) {
-      // Check if stats already exist for this user+date
-      const existingStats = await ctx.db
-        .query("dailyStats")
-        .withIndex("by_user_date", (q) =>
-          q.eq("userId", args.userId).eq("date", stat.date)
-        )
-        .unique();
+    // Delete all existing stats for this user
+    const existingStats = await ctx.db
+      .query("dailyStats")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
 
-      if (existingStats) {
-        // Update existing record
-        await ctx.db.patch(existingStats._id, {
-          inputTokens: stat.inputTokens,
-          outputTokens: stat.outputTokens,
-          cacheCreationTokens: stat.cacheCreationTokens,
-          cacheReadTokens: stat.cacheReadTokens,
-          totalTokens: stat.totalTokens,
-          totalCost: stat.totalCost,
-          modelsUsed: stat.modelsUsed,
-          // Update UTC fields if provided (may be missing for legacy data)
-          ...(stat.utcDate && { utcDate: stat.utcDate }),
-          ...(stat.timezoneOffset !== undefined && { timezoneOffset: stat.timezoneOffset }),
-          updatedAt: now,
-        });
-        results.push(`updated:${stat.date}`);
-      } else {
-        // Create new record
-        await ctx.db.insert("dailyStats", {
-          userId: args.userId,
-          date: stat.date,
-          utcDate: stat.utcDate, // May be undefined for legacy data
-          timezoneOffset: stat.timezoneOffset, // May be undefined for legacy data
-          inputTokens: stat.inputTokens,
-          outputTokens: stat.outputTokens,
-          cacheCreationTokens: stat.cacheCreationTokens,
-          cacheReadTokens: stat.cacheReadTokens,
-          totalTokens: stat.totalTokens,
-          totalCost: stat.totalCost,
-          modelsUsed: stat.modelsUsed,
-          updatedAt: now,
-        });
-        results.push(`created:${stat.date}`);
-      }
+    for (const stat of existingStats) {
+      await ctx.db.delete(stat._id);
     }
 
-    return { success: true, results };
+    // Insert all new stats
+    for (const stat of args.stats) {
+      await ctx.db.insert("dailyStats", {
+        userId: args.userId,
+        date: stat.date,
+        utcDate: stat.utcDate,
+        timezoneOffset: stat.timezoneOffset,
+        inputTokens: stat.inputTokens,
+        outputTokens: stat.outputTokens,
+        cacheCreationTokens: stat.cacheCreationTokens,
+        cacheReadTokens: stat.cacheReadTokens,
+        totalTokens: stat.totalTokens,
+        totalCost: stat.totalCost,
+        modelsUsed: stat.modelsUsed,
+        updatedAt: now,
+      });
+    }
+
+    return {
+      success: true,
+      deleted: existingStats.length,
+      inserted: args.stats.length,
+    };
+  },
+});
+
+/**
+ * Delete all stats for a user by display name.
+ * Used for cleanup of test data.
+ */
+export const deleteStatsByDisplayName = mutation({
+  args: {
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find user by display name
+    const users = await ctx.db.query("users").collect();
+    const user = users.find((u) => u.displayName === args.displayName);
+
+    if (!user) {
+      return { success: false, error: "User not found", deleted: 0 };
+    }
+
+    // Get all stats for this user
+    const stats = await ctx.db
+      .query("dailyStats")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Delete each stat
+    for (const stat of stats) {
+      await ctx.db.delete(stat._id);
+    }
+
+    return { success: true, deleted: stats.length, userId: user._id };
   },
 });
 
