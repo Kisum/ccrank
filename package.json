@@ -1,56 +1,24 @@
 {
-  "name": "ccrank",
+  "name": "ccrank-monorepo",
   "version": "1.0.0",
-  "description": "CLI tool to sync Claude Code usage to the ccrank leaderboard",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "ccrank": "./dist/cli.js"
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "ts-node src/cli.ts",
-    "prepublishOnly": "npm run build",
-    "clean": "rm -rf dist"
-  },
-  "keywords": [
-    "ccusage",
-    "leaderboard",
-    "cli",
-    "stats",
-    "sync",
-    "claude",
-    "anthropic",
-    "usage-tracking",
-    "analytics"
+  "private": true,
+  "description": "Claude Code usage leaderboard - CLI and web app",
+  "workspaces": [
+    "packages/*"
   ],
-  "author": "",
-  "license": "MIT",
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:cli": "npm run build -w packages/cli",
+    "build:web": "npm run build -w packages/web",
+    "dev:web": "npm run dev -w packages/web",
+    "lint": "npm run lint --workspaces --if-present"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Kisum/ccrank.git"
   },
-  "bugs": {
-    "url": "https://github.com/Kisum/ccrank/issues"
-  },
-  "homepage": "https://github.com/Kisum/ccrank#readme",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "dependencies": {
-    "commander": "^12.0.0",
-    "axios": "^1.6.5",
-    "chalk": "^4.1.2",
-    "ora": "^5.4.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.5",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
-  },
+  "license": "MIT",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   }
 }
