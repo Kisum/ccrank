@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 
@@ -54,9 +55,11 @@ export default function SetupPage() {
           <div className="bg-[#111118] border border-[#1f1f2e] rounded-xl p-6">
             <div className="mb-6 flex items-center gap-3">
               {session.user?.image && (
-                <img
+                <Image
                   src={session.user.image}
                   alt=""
+                  width={40}
+                  height={40}
                   className="w-10 h-10 rounded-full"
                 />
               )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import Leaderboard from "@/components/Leaderboard";
@@ -55,9 +56,11 @@ export default function Home() {
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-[#e0e0e0]">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
               alt="Rye logo"
+              width={40}
+              height={40}
               className="w-10 h-10"
             />
             <h1 className="text-xl font-bold text-black">Claude Code Usage Leaderboard</h1>
@@ -119,9 +122,11 @@ export default function Home() {
       <footer className="border-t border-[#e0e0e0] py-6">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
           <p className="text-sm text-gray-500">Powered by</p>
-          <img
+          <Image
             src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
             alt="Rye logo"
+            width={20}
+            height={20}
             className="w-5 h-5"
           />
           <span className="text-sm font-semibold text-black">Rye</span>

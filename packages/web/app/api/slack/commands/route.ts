@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
 
     // Parse the form data
     const params = new URLSearchParams(body);
-    const command = params.get("command");
     const text = params.get("text")?.trim() || "";
     const userId = params.get("user_id");
     const teamId = params.get("team_id");
