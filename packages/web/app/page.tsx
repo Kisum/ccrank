@@ -60,7 +60,7 @@ export default function Home() {
               alt="Rye logo"
               className="w-10 h-10"
             />
-            <h1 className="text-xl font-bold text-black">Rye Claude Code Usage Leaderboard</h1>
+            <h1 className="text-xl font-bold text-black">Claude Code Usage Leaderboard</h1>
           </div>
 
           <a
