@@ -22,20 +22,37 @@ function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-// Helper to get start of current week (Monday) in UTC
+// Helper to get tomorrow's date (for inclusive end range with timezone buffer)
+function getTomorrow(): string {
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  return tomorrow.toISOString().split("T")[0];
+}
+
+// Helper to get yesterday's date (for timezone buffer on start dates)
+function getYesterday(): string {
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return yesterday.toISOString().split("T")[0];
+}
+
+// Helper to get start of current week (Sunday before Monday for timezone buffer)
 function getWeekStart(): string {
   const now = new Date();
   const dayOfWeek = now.getUTCDay();
   const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust so Monday is start
   const monday = new Date(now);
   monday.setUTCDate(now.getUTCDate() - diff);
+  // Subtract 1 more day for timezone buffer
+  monday.setUTCDate(monday.getUTCDate() - 1);
   return monday.toISOString().split("T")[0];
 }
 
-// Helper to get start of current month in UTC
+// Helper to get start of current month (with timezone buffer)
 function getMonthStart(): string {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  // Use last day of previous month for timezone buffer
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0))
     .toISOString()
     .split("T")[0];
 }
@@ -138,7 +155,8 @@ async function buildLeaderboard(
 
 /**
  * Get today's leaderboard.
- * Uses UTC date for accurate cross-timezone comparisons.
+ * Uses expanded date range (yesterday to tomorrow) to handle timezone differences
+ * when utcDate is not populated in legacy data.
  */
 export const getDailyLeaderboard = query({
   args: {
@@ -146,8 +164,10 @@ export const getDailyLeaderboard = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const today = getToday();
-    const leaderboard = await buildLeaderboard(ctx, today, today, args.teamId);
+    // Use wider range to catch timezone edge cases
+    const yesterday = getYesterday();
+    const tomorrow = getTomorrow();
+    const leaderboard = await buildLeaderboard(ctx, yesterday, tomorrow, args.teamId);
 
     if (args.limit) {
       return leaderboard.slice(0, args.limit);
@@ -166,11 +186,11 @@ export const getWeeklyLeaderboard = query({
   },
   handler: async (ctx, args) => {
     const weekStart = getWeekStart();
-    const today = getToday();
+    const tomorrow = getTomorrow();
     const leaderboard = await buildLeaderboard(
       ctx,
       weekStart,
-      today,
+      tomorrow,
       args.teamId
     );
 
@@ -191,11 +211,11 @@ export const getMonthlyLeaderboard = query({
   },
   handler: async (ctx, args) => {
     const monthStart = getMonthStart();
-    const today = getToday();
+    const tomorrow = getTomorrow();
     const leaderboard = await buildLeaderboard(
       ctx,
       monthStart,
-      today,
+      tomorrow,
       args.teamId
     );
 
@@ -215,11 +235,11 @@ export const getAllTimeLeaderboard = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Use a very old start date to get all stats
+    // Use a very old start date and tomorrow for timezone buffer
     const leaderboard = await buildLeaderboard(
       ctx,
       "2000-01-01",
-      getToday(),
+      getTomorrow(),
       args.teamId
     );
 
@@ -248,20 +268,26 @@ export const getUserRank = query({
     if (!user) return null;
 
     let startDate: string;
+    let endDate: string;
     const today = getToday();
+    const tomorrow = getTomorrow();
 
     switch (args.period) {
       case "daily":
-        startDate = today;
+        startDate = getYesterday();
+        endDate = tomorrow;
         break;
       case "weekly":
         startDate = getWeekStart();
+        endDate = tomorrow;
         break;
       case "monthly":
         startDate = getMonthStart();
+        endDate = tomorrow;
         break;
       case "allTime":
         startDate = "2000-01-01";
+        endDate = tomorrow;
         break;
     }
 
@@ -269,7 +295,7 @@ export const getUserRank = query({
     const leaderboard = await buildLeaderboard(
       ctx,
       startDate,
-      today,
+      endDate,
       user.slackTeamId
     );
 
@@ -339,30 +365,35 @@ export const getStatsSummary = query({
   },
   handler: async (ctx, args) => {
     let startDate: string;
-    const today = getToday();
+    let endDate: string;
+    const tomorrow = getTomorrow();
 
     switch (args.period) {
       case "daily":
-        startDate = today;
+        startDate = getYesterday();
+        endDate = tomorrow;
         break;
       case "weekly":
         startDate = getWeekStart();
+        endDate = tomorrow;
         break;
       case "monthly":
         startDate = getMonthStart();
+        endDate = tomorrow;
         break;
       case "alltime":
         startDate = "2000-01-01";
+        endDate = tomorrow;
         break;
     }
 
     // Get all daily stats in the date range
     const allStats = await ctx.db.query("dailyStats").collect();
 
-    // Filter by date range using UTC date when available
+    // Filter by date range using UTC date when available (with timezone buffer)
     const filteredStats = allStats.filter((s: Doc<"dailyStats">) => {
       const effectiveDate = getEffectiveDate(s);
-      return effectiveDate >= startDate && effectiveDate <= today;
+      return effectiveDate >= startDate && effectiveDate <= endDate;
     });
 
     // Calculate totals
