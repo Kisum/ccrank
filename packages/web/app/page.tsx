@@ -121,7 +121,6 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-[#e0e0e0] py-6">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
-          <p className="text-sm text-gray-500">Powered by</p>
           <Image
             src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
             alt="Rye logo"

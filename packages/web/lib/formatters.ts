@@ -48,11 +48,11 @@ export function formatPeriod(
 ): string {
   switch (period) {
     case "daily":
-      return "Today";
+      return "24 hours";
     case "weekly":
-      return "This Week";
+      return "7 days";
     case "monthly":
-      return "This Month";
+      return "30 days";
     case "alltime":
       return "All Time";
   }

@@ -5,9 +5,8 @@
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 import ora from 'ora';
-import { requireAuth, getApiEndpoint } from '../config';
+import { getApiEndpoint, readConfig } from '../config';
 import { validateCCUsageData, transformToLeaderboardEntries, getSummaryStats } from '../transformer';
-import { syncToLeaderboard } from '../api';
 import { CCUsageOutput } from '../types';
 
 /**
@@ -37,23 +36,107 @@ async function readStdin(): Promise<string> {
 }
 
 /**
- * Run ccusage command and get JSON output
+ * Try to run ccusage command with given method
  */
-function runCCUsage(period: string = 'daily'): CCUsageOutput {
+function tryRunCCUsage(period: string, command: string): CCUsageOutput {
   try {
-    const output = execSync(`ccusage ${period} --json`, {
+    const output = execSync(`${command} ${period} --json`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
     });
-
     return JSON.parse(output);
   } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      throw new Error('ccusage command not found. Please install ccusage first.');
+    // Re-throw with stderr attached for better error handling
+    if (error.stderr) {
+      error.stderr = error.stderr.toString();
     }
-    throw new Error(`Failed to run ccusage: ${error.message}`);
+    throw error;
   }
+}
+
+/**
+ * Run ccusage command and get JSON output
+ * Tries local install first, then falls back to npx
+ */
+function runCCUsage(period: string = 'daily'): CCUsageOutput {
+  const errors: string[] = [];
+
+  // Try 1: Check if ccusage is available globally/locally
+  try {
+    return tryRunCCUsage(period, 'ccusage');
+  } catch (error: any) {
+    // Check for command not found (ENOENT or stderr containing 'not found')
+    const stderr = error.stderr || '';
+    if (error.code === 'ENOENT' || stderr.includes('not found') || stderr.includes('No such')) {
+      errors.push('Local ccusage not found');
+    } else {
+      throw new Error(`Failed to run ccusage: ${error.message}`);
+    }
+  }
+
+  // Try 2: Use npx to run without installation
+  try {
+    return tryRunCCUsage(period, 'npx ccusage@latest');
+  } catch (error: any) {
+    errors.push(`npx fallback failed: ${error.message}`);
+  }
+
+  // Try 3: Use pnpm dlx as another fallback
+  try {
+    return tryRunCCUsage(period, 'pnpm dlx ccusage@latest');
+  } catch (error: any) {
+    errors.push(`pnpm fallback failed: ${error.message}`);
+  }
+
+  // All methods failed
+  throw new Error(
+    `ccusage could not be executed.\n\n` +
+    `Attempts made:\n` +
+    errors.map(e => `  - ${e}`).join('\n') +
+    `\n\nTo fix this, you can:\n` +
+    `  1. Install ccusage globally: npm install -g ccusage\n` +
+    `  2. Or ensure npx is available (comes with Node.js)\n` +
+    `  3. Or pipe data manually: ccusage --json | ccrank sync --stdin`
+  );
+}
+
+/**
+ * Sync data using public API (no auth required)
+ */
+async function syncPublic(
+  entries: any[],
+  username: string,
+  apiEndpoint: string,
+  quiet: boolean
+): Promise<{ success: boolean; message: string; entriesProcessed: number }> {
+  const url = new URL(apiEndpoint);
+  url.searchParams.set('user', username);
+  
+  // Add timezone offset
+  const tzOffset = new Date().getTimezoneOffset();
+  const sign = tzOffset <= 0 ? '+' : '-';
+  const hours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+  const minutes = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+  url.searchParams.set('tz', `${sign}${hours}${minutes}`);
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ daily: entries }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  const result = await response.json() as { message: string; count: number };
+  return {
+    success: true,
+    message: result.message,
+    entriesProcessed: result.count,
+  };
 }
 
 /**
@@ -64,6 +147,7 @@ export async function syncCommand(options: {
   period?: string;
   dryRun?: boolean;
   quiet?: boolean;
+  user?: string;
 }): Promise<void> {
   const quiet = options.quiet || false;
 
@@ -84,13 +168,16 @@ export async function syncCommand(options: {
   } : ora();
 
   try {
-    // Check authentication
-    const config = requireAuth();
-    const apiEndpoint = getApiEndpoint(config);
-
-    if (!config.username) {
-      throw new Error('Username not found in config. Please run: ccrank setup <api-key>');
+    // Get config (optional - public sync doesn't require auth)
+    const config = readConfig();
+    
+    // Determine username: --user flag > config > error
+    const username = options.user || config?.username;
+    if (!username) {
+      throw new Error('Username required. Run: ccrank setup <username> or use --user <username>');
     }
+
+    const apiEndpoint = getApiEndpoint(config);
 
     // Get ccusage data
     if (!quiet) (spinner as any).start?.('Loading ccusage data...');
@@ -129,7 +216,7 @@ export async function syncCommand(options: {
 
     // Transform to leaderboard entries
     if (!quiet) (spinner as any).start?.('Transforming data...');
-    const entries = transformToLeaderboardEntries(ccusageData, config.username);
+    const entries = transformToLeaderboardEntries(ccusageData, username);
     if (!quiet) (spinner as any).succeed?.(`Prepared ${entries.length} entries for sync`);
 
     if (options.dryRun) {
@@ -139,18 +226,15 @@ export async function syncCommand(options: {
       return;
     }
 
-    // Upload to API
+    // Upload to API (public - no auth required)
     if (!quiet) (spinner as any).start?.('Syncing to leaderboard...');
-    const response = await syncToLeaderboard(entries, config.apiKey, apiEndpoint);
+    const response = await syncPublic(entries, username, apiEndpoint, quiet);
 
     if (response.success) {
       if (!quiet) (spinner as any).succeed?.('Sync completed successfully!');
       log(chalk.green(`\n✓ ${response.message}`));
       log(chalk.gray(`  Entries processed: ${response.entriesProcessed}`));
-
-      if (response.leaderboardUrl) {
-        log(chalk.cyan(`\n  View leaderboard: ${response.leaderboardUrl}\n`));
-      }
+      log(chalk.cyan(`\n  View leaderboard: https://ccusageshare-leaderboard.vercel.app\n`));
     } else {
       if (!quiet) (spinner as any).fail?.('Sync failed');
       throw new Error(response.message);

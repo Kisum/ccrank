@@ -8,9 +8,9 @@ interface LeaderboardTabsProps {
 }
 
 const tabs: { id: Period; label: string }[] = [
-  { id: "daily", label: "Daily" },
-  { id: "weekly", label: "Weekly" },
-  { id: "monthly", label: "Monthly" },
+  { id: "daily", label: "24 hours" },
+  { id: "weekly", label: "7 days" },
+  { id: "monthly", label: "30 days" },
   { id: "alltime", label: "All-Time" },
 ];
 

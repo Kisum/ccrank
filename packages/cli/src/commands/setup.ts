@@ -102,7 +102,7 @@ function writeClaudeSettings(settings: ClaudeSettings): void {
 /**
  * Install the Claude Code SessionEnd hook
  */
-function installClaudeHook(): { installed: boolean; alreadyExists: boolean } {
+function installClaudeHook(username: string): { installed: boolean; alreadyExists: boolean } {
   const settings = readClaudeSettings();
 
   // Initialize hooks structure if needed
@@ -113,13 +113,22 @@ function installClaudeHook(): { installed: boolean; alreadyExists: boolean } {
     settings.hooks.SessionEnd = [];
   }
 
-  // Check if hook already exists
-  const hookCommand = 'npx github:Kisum/ccrank sync --quiet';
-  const existingHook = settings.hooks.SessionEnd.find(
-    hook => hook.command === hookCommand
+  // Check if hook already exists (check for any ccrank sync command)
+  const existingHookIndex = settings.hooks.SessionEnd.findIndex(
+    hook => hook.command.includes('ccrank sync')
   );
 
-  if (existingHook) {
+  // New hook command with embedded username
+  const hookCommand = `npx github:Kisum/ccrank sync --quiet --user ${username}`;
+
+  if (existingHookIndex >= 0) {
+    // Update existing hook with new command
+    settings.hooks.SessionEnd[existingHookIndex] = {
+      type: 'command',
+      command: hookCommand,
+      timeout: 30,
+    };
+    writeClaudeSettings(settings);
     return { installed: true, alreadyExists: true };
   }
 
@@ -186,10 +195,10 @@ export async function setupCommand(usernameOrApiKey: string): Promise<void> {
 
     // Install Claude Code hook
     spinner.start('Installing Claude Code hook...');
-    const hookResult = installClaudeHook();
+    const hookResult = installClaudeHook(username);
 
     if (hookResult.alreadyExists) {
-      spinner.succeed('Claude Code hook already installed');
+      spinner.succeed('Claude Code hook updated');
     } else {
       spinner.succeed('Claude Code hook installed');
     }

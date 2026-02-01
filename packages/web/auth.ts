@@ -1,5 +1,24 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
+import type { DefaultSession } from "next-auth";
+
+// Extend NextAuth types to include GitHub username
+declare module "next-auth" {
+  interface Session {
+    user: {
+      username?: string;
+    } & DefaultSession["user"];
+  }
+}
+
+// GitHub profile type
+type GitHubProfile = {
+  login: string;
+  id: number;
+  avatar_url: string;
+  name?: string;
+  email?: string;
+};
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -10,14 +29,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     jwt({ token, profile }) {
-      if (profile) {
-        token.username = profile.login;
+      if (profile && 'login' in profile) {
+        token.username = (profile as unknown as GitHubProfile).login;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user && token.username) {
-        (session.user as { username?: string }).username = token.username as string;
+        session.user.username = token.username as string;
       }
       return session;
     },

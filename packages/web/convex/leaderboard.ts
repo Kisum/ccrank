@@ -17,11 +17,6 @@ type LeaderboardEntry = {
   rank: number;
 };
 
-// Helper to get today's date in YYYY-MM-DD format (UTC)
-function getToday(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
 // Helper to get tomorrow's date (for inclusive end range with timezone buffer)
 function getTomorrow(): string {
   const tomorrow = new Date();
@@ -29,32 +24,12 @@ function getTomorrow(): string {
   return tomorrow.toISOString().split("T")[0];
 }
 
-// Helper to get yesterday's date (for timezone buffer on start dates)
-function getYesterday(): string {
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  return yesterday.toISOString().split("T")[0];
-}
-
-// Helper to get start of current week (Sunday before Monday for timezone buffer)
-function getWeekStart(): string {
-  const now = new Date();
-  const dayOfWeek = now.getUTCDay();
-  const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust so Monday is start
-  const monday = new Date(now);
-  monday.setUTCDate(now.getUTCDate() - diff);
-  // Subtract 1 more day for timezone buffer
-  monday.setUTCDate(monday.getUTCDate() - 1);
-  return monday.toISOString().split("T")[0];
-}
-
-// Helper to get start of current month (with timezone buffer)
-function getMonthStart(): string {
-  const now = new Date();
-  // Use last day of previous month for timezone buffer
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0))
-    .toISOString()
-    .split("T")[0];
+// Helper to get date N days ago (with 1 day buffer for timezone handling)
+function getDaysAgo(days: number): string {
+  const date = new Date();
+  // Add 1 extra day buffer for timezone edge cases
+  date.setUTCDate(date.getUTCDate() - days - 1);
+  return date.toISOString().split("T")[0];
 }
 
 // Helper to get the effective date for filtering (prefer utcDate, fallback to date)
@@ -154,9 +129,8 @@ async function buildLeaderboard(
 }
 
 /**
- * Get today's leaderboard.
- * Uses expanded date range (yesterday to tomorrow) to handle timezone differences
- * when utcDate is not populated in legacy data.
+ * Get last 24 hours leaderboard (rolling 1-day window).
+ * Uses expanded date range for timezone handling.
  */
 export const getDailyLeaderboard = query({
   args: {
@@ -164,10 +138,9 @@ export const getDailyLeaderboard = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Use wider range to catch timezone edge cases
-    const yesterday = getYesterday();
-    const tomorrow = getTomorrow();
-    const leaderboard = await buildLeaderboard(ctx, yesterday, tomorrow, args.teamId);
+    const startDate = getDaysAgo(1);
+    const endDate = getTomorrow();
+    const leaderboard = await buildLeaderboard(ctx, startDate, endDate, args.teamId);
 
     if (args.limit) {
       return leaderboard.slice(0, args.limit);
@@ -177,7 +150,7 @@ export const getDailyLeaderboard = query({
 });
 
 /**
- * Get current week's leaderboard.
+ * Get last 7 days leaderboard (rolling 7-day window).
  */
 export const getWeeklyLeaderboard = query({
   args: {
@@ -185,12 +158,12 @@ export const getWeeklyLeaderboard = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const weekStart = getWeekStart();
-    const tomorrow = getTomorrow();
+    const startDate = getDaysAgo(7);
+    const endDate = getTomorrow();
     const leaderboard = await buildLeaderboard(
       ctx,
-      weekStart,
-      tomorrow,
+      startDate,
+      endDate,
       args.teamId
     );
 
@@ -202,7 +175,7 @@ export const getWeeklyLeaderboard = query({
 });
 
 /**
- * Get current month's leaderboard.
+ * Get last 30 days leaderboard (rolling 30-day window).
  */
 export const getMonthlyLeaderboard = query({
   args: {
@@ -210,12 +183,12 @@ export const getMonthlyLeaderboard = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const monthStart = getMonthStart();
-    const tomorrow = getTomorrow();
+    const startDate = getDaysAgo(30);
+    const endDate = getTomorrow();
     const leaderboard = await buildLeaderboard(
       ctx,
-      monthStart,
-      tomorrow,
+      startDate,
+      endDate,
       args.teamId
     );
 
@@ -273,15 +246,15 @@ export const getUserRank = query({
 
     switch (args.period) {
       case "daily":
-        startDate = getYesterday();
+        startDate = getDaysAgo(1);
         endDate = tomorrow;
         break;
       case "weekly":
-        startDate = getWeekStart();
+        startDate = getDaysAgo(7);
         endDate = tomorrow;
         break;
       case "monthly":
-        startDate = getMonthStart();
+        startDate = getDaysAgo(30);
         endDate = tomorrow;
         break;
       case "allTime":
@@ -369,15 +342,15 @@ export const getStatsSummary = query({
 
     switch (args.period) {
       case "daily":
-        startDate = getYesterday();
+        startDate = getDaysAgo(1);
         endDate = tomorrow;
         break;
       case "weekly":
-        startDate = getWeekStart();
+        startDate = getDaysAgo(7);
         endDate = tomorrow;
         break;
       case "monthly":
-        startDate = getMonthStart();
+        startDate = getDaysAgo(30);
         endDate = tomorrow;
         break;
       case "alltime":

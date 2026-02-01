@@ -34,6 +34,7 @@ program
   .option('--period <period>', 'Period to sync (daily, weekly, monthly)', 'daily')
   .option('--dry-run', 'Show what would be synced without uploading')
   .option('--quiet', 'Suppress output (for hook usage)')
+  .option('--user <username>', 'Username (if not configured)')
   .action(async (options) => {
     await syncCommand(options);
   });

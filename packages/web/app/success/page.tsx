@@ -91,7 +91,6 @@ export default function SuccessPage() {
 
       {/* Footer */}
       <footer className="absolute bottom-6 text-sm text-gray-500">
-        Powered by{" "}
         <span className="font-semibold gradient-text">ccrank</span>
       </footer>
     </div>
