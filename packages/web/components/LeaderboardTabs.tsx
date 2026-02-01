@@ -19,17 +19,17 @@ export default function LeaderboardTabs({
   onPeriodChange,
 }: LeaderboardTabsProps) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-[#111118] rounded-xl border border-[#1f1f2e]">
+    <div className="flex items-center gap-1 p-1 bg-[#f5f5f5] border border-[#e0e0e0]">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onPeriodChange(tab.id)}
           className={`
-            relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
+            relative px-4 py-2 text-sm font-medium transition-all duration-200
             ${
               activePeriod === tab.id
-                ? "bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-white tab-active"
-                : "text-gray-400 hover:text-gray-200 hover:bg-[#1f1f2e]"
+                ? "bg-[#CCFF6F] text-black tab-active"
+                : "text-gray-600 hover:text-black hover:bg-[#e0e0e0]"
             }
           `}
         >

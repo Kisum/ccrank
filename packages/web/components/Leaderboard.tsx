@@ -32,25 +32,25 @@ function getRankDisplay(rank: number): React.ReactNode {
   switch (rank) {
     case 1:
       return (
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full rank-gold text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-8 h-8 rank-gold text-sm font-bold">
           1
         </span>
       );
     case 2:
       return (
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full rank-silver text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-8 h-8 rank-silver text-sm font-bold">
           2
         </span>
       );
     case 3:
       return (
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full rank-bronze text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-8 h-8 rank-bronze text-sm font-bold">
           3
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center justify-center w-8 h-8 text-gray-400 text-sm font-medium">
+        <span className="inline-flex items-center justify-center w-8 h-8 text-gray-500 text-sm font-medium">
           {rank}
         </span>
       );
@@ -63,14 +63,14 @@ function LoadingSkeleton() {
       {[...Array(5)].map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 p-4 bg-[#111118] rounded-xl border border-[#1f1f2e] loading-pulse"
+          className="flex items-center gap-4 p-4 bg-[#f5f5f5] border border-[#e0e0e0] loading-pulse"
         >
-          <div className="w-8 h-8 bg-[#1f1f2e] rounded-full" />
+          <div className="w-8 h-8 bg-[#e0e0e0]" />
           <div className="flex-1">
-            <div className="h-4 w-32 bg-[#1f1f2e] rounded" />
+            <div className="h-4 w-32 bg-[#e0e0e0]" />
           </div>
-          <div className="h-4 w-16 bg-[#1f1f2e] rounded" />
-          <div className="h-4 w-20 bg-[#1f1f2e] rounded" />
+          <div className="h-4 w-16 bg-[#e0e0e0]" />
+          <div className="h-4 w-20 bg-[#e0e0e0]" />
         </div>
       ))}
     </div>
@@ -80,9 +80,9 @@ function LoadingSkeleton() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="w-16 h-16 mb-4 rounded-full bg-[#111118] border border-[#1f1f2e] flex items-center justify-center">
+      <div className="w-16 h-16 mb-4 bg-[#f5f5f5] border border-[#e0e0e0] flex items-center justify-center">
         <svg
-          className="w-8 h-8 text-gray-500"
+          className="w-8 h-8 text-gray-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -95,7 +95,7 @@ function EmptyState() {
           />
         </svg>
       </div>
-      <h3 className="text-lg font-semibold text-gray-300 mb-2">No data yet</h3>
+      <h3 className="text-lg font-semibold text-black mb-2">No data yet</h3>
       <p className="text-gray-500 text-center max-w-sm">
         Usage data will appear here once developers start tracking their Claude
         Code usage.
@@ -170,11 +170,11 @@ function LeaderboardContent({
             <div
               key={`${entry.rank}-${entry.slackUserId}`}
               className={`
-                flex items-center gap-4 p-4 rounded-xl border transition-all duration-200
+                flex items-center gap-4 p-4 border transition-all duration-200
                 ${
                   entry.rank <= 3
-                    ? "bg-gradient-to-r from-[#111118] to-[#15151f] border-[#2a2a3e] card-hover"
-                    : "bg-[#111118] border-[#1f1f2e] hover:border-[#2a2a3e]"
+                    ? "bg-[#f5f5f5] border-[#e0e0e0] card-hover"
+                    : "bg-white border-[#e0e0e0] hover:bg-[#f5f5f5]"
                 }
               `}
             >
@@ -187,15 +187,7 @@ function LeaderboardContent({
                   href={`https://github.com/${username}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`font-medium truncate block hover:underline ${
-                    entry.rank === 1
-                      ? "text-yellow-400"
-                      : entry.rank === 2
-                        ? "text-gray-300"
-                        : entry.rank === 3
-                          ? "text-orange-400"
-                          : "text-gray-200"
-                  }`}
+                  className="font-medium truncate block hover:underline text-black"
                 >
                   @{username}
                 </a>
@@ -203,14 +195,14 @@ function LeaderboardContent({
 
               {/* Tokens */}
               <div className="w-24 text-right">
-                <span className="font-mono text-sm text-indigo-400">
+                <span className="font-mono text-sm text-gray-600">
                   {formatTokens(entry.totalTokens)}
                 </span>
               </div>
 
               {/* Cost */}
               <div className="w-24 text-right">
-                <span className="font-mono text-sm font-semibold text-emerald-400">
+                <span className="font-mono text-sm font-semibold text-black">
                   {formatCost(entry.totalCost)}
                 </span>
               </div>
