@@ -1,0 +1,197 @@
+/**
+ * Setup command - configure API key and install Claude Code hook
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import chalk from 'chalk';
+import ora from 'ora';
+import axios from 'axios';
+import { writeConfig, getApiEndpoint } from '../config';
+
+const CLAUDE_SETTINGS_DIR = path.join(os.homedir(), '.claude');
+const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_SETTINGS_DIR, 'settings.json');
+
+interface ClaudeSettings {
+  hooks?: {
+    SessionEnd?: Array<{
+      type: string;
+      command: string;
+      timeout?: number;
+    }>;
+  };
+  [key: string]: any;
+}
+
+/**
+ * Validate API key by calling the API
+ */
+async function validateApiKeyWithServer(apiKey: string, apiEndpoint: string): Promise<{ valid: boolean; username?: string; error?: string }> {
+  try {
+    const response = await axios.post(
+      apiEndpoint,
+      { entries: [], source: 'ccusage', version: '1.0.0' },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'ccrank/1.0.0',
+        },
+        timeout: 10000,
+      }
+    );
+
+    // If we get here, the API key is valid
+    return {
+      valid: true,
+      username: response.data?.username || response.data?.user?.name || 'User'
+    };
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        return { valid: false, error: 'Invalid API key' };
+      } else if (error.response?.status === 403) {
+        return { valid: false, error: 'API key does not have permission' };
+      } else if (error.response) {
+        // Other response errors - might still mean valid auth
+        return {
+          valid: true,
+          username: error.response.data?.username || 'User'
+        };
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        return { valid: false, error: 'Could not connect to API server' };
+      }
+    }
+    return { valid: false, error: 'Failed to validate API key' };
+  }
+}
+
+/**
+ * Read Claude settings file
+ */
+function readClaudeSettings(): ClaudeSettings {
+  try {
+    if (!fs.existsSync(CLAUDE_SETTINGS_FILE)) {
+      return {};
+    }
+    const data = fs.readFileSync(CLAUDE_SETTINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    // If file exists but is invalid JSON, start fresh
+    return {};
+  }
+}
+
+/**
+ * Write Claude settings file
+ */
+function writeClaudeSettings(settings: ClaudeSettings): void {
+  // Ensure directory exists
+  if (!fs.existsSync(CLAUDE_SETTINGS_DIR)) {
+    fs.mkdirSync(CLAUDE_SETTINGS_DIR, { recursive: true, mode: 0o700 });
+  }
+
+  fs.writeFileSync(
+    CLAUDE_SETTINGS_FILE,
+    JSON.stringify(settings, null, 2),
+    { mode: 0o600 }
+  );
+}
+
+/**
+ * Install the Claude Code SessionEnd hook
+ */
+function installClaudeHook(): { installed: boolean; alreadyExists: boolean } {
+  const settings = readClaudeSettings();
+
+  // Initialize hooks structure if needed
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  if (!settings.hooks.SessionEnd) {
+    settings.hooks.SessionEnd = [];
+  }
+
+  // Check if hook already exists
+  const hookCommand = 'npx ccrank sync --quiet';
+  const existingHook = settings.hooks.SessionEnd.find(
+    hook => hook.command === hookCommand
+  );
+
+  if (existingHook) {
+    return { installed: true, alreadyExists: true };
+  }
+
+  // Add the hook
+  settings.hooks.SessionEnd.push({
+    type: 'command',
+    command: hookCommand,
+    timeout: 30,
+  });
+
+  writeClaudeSettings(settings);
+  return { installed: true, alreadyExists: false };
+}
+
+/**
+ * Setup command handler
+ */
+export async function setupCommand(apiKey: string): Promise<void> {
+  const spinner = ora();
+
+  console.log(chalk.bold('\nccrank Setup\n'));
+
+  // Validate API key format
+  if (!apiKey || apiKey.length < 20) {
+    console.error(chalk.red('Error: Invalid API key format. API key must be at least 20 characters.\n'));
+    console.log('Usage: ccrank setup <api-key>\n');
+    process.exit(1);
+  }
+
+  try {
+    // Step 1: Validate API key with server
+    spinner.start('Validating API key...');
+    const apiEndpoint = getApiEndpoint(null);
+    const validation = await validateApiKeyWithServer(apiKey, apiEndpoint);
+
+    if (!validation.valid) {
+      spinner.fail(`API key validation failed: ${validation.error}`);
+      process.exit(1);
+    }
+    spinner.succeed('API key validated');
+
+    // Step 2: Save configuration
+    spinner.start('Saving configuration...');
+    writeConfig({
+      apiKey,
+      username: validation.username,
+    });
+    spinner.succeed('Configuration saved to ~/.ccrank/config.json');
+
+    // Step 3: Install Claude Code hook
+    spinner.start('Installing Claude Code hook...');
+    const hookResult = installClaudeHook();
+
+    if (hookResult.alreadyExists) {
+      spinner.succeed('Claude Code hook already installed');
+    } else {
+      spinner.succeed('Claude Code hook installed');
+    }
+
+    // Success message
+    console.log(chalk.green('\n✓ Setup completed successfully!\n'));
+    console.log(chalk.gray(`  Username: ${validation.username}`));
+    console.log(chalk.gray(`  Config: ~/.ccrank/config.json`));
+    console.log(chalk.gray(`  Hook: ~/.claude/settings.json\n`));
+
+    console.log('Your Claude Code usage will now be synced automatically after each session.');
+    console.log('You can also manually sync anytime with:');
+    console.log(chalk.cyan('  ccrank sync\n'));
+
+  } catch (error) {
+    spinner.fail('Setup failed');
+    console.error(chalk.red(`\nError: ${error instanceof Error ? error.message : String(error)}\n`));
+    process.exit(1);
+  }
+}

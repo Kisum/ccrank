@@ -1,0 +1,39 @@
+# Separate projects
+ccusageshare-leaderboard/
+convex/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Config files (sensitive)
+.ccusageshare/
+config.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
