@@ -136,40 +136,55 @@ function installClaudeHook(): { installed: boolean; alreadyExists: boolean } {
 
 /**
  * Setup command handler
+ * Accepts either a username (simple setup) or API key (authenticated setup)
  */
-export async function setupCommand(apiKey: string): Promise<void> {
+export async function setupCommand(usernameOrApiKey: string): Promise<void> {
   const spinner = ora();
 
   console.log(chalk.bold('\nccrank Setup\n'));
 
-  // Validate API key format
-  if (!apiKey || apiKey.length < 20) {
-    console.error(chalk.red('Error: Invalid API key format. API key must be at least 20 characters.\n'));
-    console.log('Usage: ccrank setup <api-key>\n');
+  if (!usernameOrApiKey || usernameOrApiKey.trim().length === 0) {
+    console.error(chalk.red('Error: Username is required.\n'));
+    console.log('Usage: ccrank setup <username>\n');
     process.exit(1);
   }
 
   try {
-    // Step 1: Validate API key with server
-    spinner.start('Validating API key...');
-    const apiEndpoint = getApiEndpoint(null);
-    const validation = await validateApiKeyWithServer(apiKey, apiEndpoint);
+    // Determine if this is a username or API key
+    // API keys are typically long (20+ chars) and contain special patterns
+    const isApiKey = usernameOrApiKey.length >= 20 && /[A-Za-z0-9_-]{20,}/.test(usernameOrApiKey);
 
-    if (!validation.valid) {
-      spinner.fail(`API key validation failed: ${validation.error}`);
-      process.exit(1);
+    let username: string;
+    let apiKey: string | undefined;
+
+    if (isApiKey) {
+      // Legacy API key flow
+      spinner.start('Validating API key...');
+      const apiEndpoint = getApiEndpoint(null);
+      const validation = await validateApiKeyWithServer(usernameOrApiKey, apiEndpoint);
+
+      if (!validation.valid) {
+        spinner.fail(`API key validation failed: ${validation.error}`);
+        process.exit(1);
+      }
+      spinner.succeed('API key validated');
+      username = validation.username || 'User';
+      apiKey = usernameOrApiKey;
+    } else {
+      // Simple username flow
+      username = usernameOrApiKey.trim();
+      spinner.succeed(`Username set to: ${username}`);
     }
-    spinner.succeed('API key validated');
 
-    // Step 2: Save configuration
+    // Save configuration
     spinner.start('Saving configuration...');
     writeConfig({
-      apiKey,
-      username: validation.username,
+      apiKey: apiKey || `user_${username}`, // Use placeholder for username-only auth
+      username,
     });
     spinner.succeed('Configuration saved to ~/.ccrank/config.json');
 
-    // Step 3: Install Claude Code hook
+    // Install Claude Code hook
     spinner.start('Installing Claude Code hook...');
     const hookResult = installClaudeHook();
 
@@ -181,7 +196,7 @@ export async function setupCommand(apiKey: string): Promise<void> {
 
     // Success message
     console.log(chalk.green('\n✓ Setup completed successfully!\n'));
-    console.log(chalk.gray(`  Username: ${validation.username}`));
+    console.log(chalk.gray(`  Username: ${username}`));
     console.log(chalk.gray(`  Config: ~/.ccrank/config.json`));
     console.log(chalk.gray(`  Hook: ~/.claude/settings.json\n`));
 

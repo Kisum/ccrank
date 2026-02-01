@@ -269,7 +269,6 @@ export const getUserRank = query({
 
     let startDate: string;
     let endDate: string;
-    const today = getToday();
     const tomorrow = getTomorrow();
 
     switch (args.period) {
