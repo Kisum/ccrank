@@ -11,27 +11,16 @@ export default function SetupPage() {
   const user = session?.user as { username?: string; name?: string | null; image?: string | null } | undefined;
   const username = user?.username || user?.name || "";
 
-  const getSetupCommand = () => {
-    return `npx github:Kisum/ccrank setup "${username}"`;
+  const [copied, setCopied] = useState(false);
+
+  const getCommand = () => {
+    return `ccusage --json | curl -s -X POST "https://ccusageshare-leaderboard.vercel.app/api/sync?user=${encodeURIComponent(username)}&tz=$(date +%z)" -H "Content-Type: application/json" -d @-`;
   };
 
-  const getSyncCommand = () => {
-    return `npx github:Kisum/ccrank sync`;
-  };
-
-  const [copiedSetup, setCopiedSetup] = useState(false);
-  const [copiedSync, setCopiedSync] = useState(false);
-
-  const copySetupCommand = () => {
-    navigator.clipboard.writeText(getSetupCommand());
-    setCopiedSetup(true);
-    setTimeout(() => setCopiedSetup(false), 2000);
-  };
-
-  const copySyncCommand = () => {
-    navigator.clipboard.writeText(getSyncCommand());
-    setCopiedSync(true);
-    setTimeout(() => setCopiedSync(false), 2000);
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(getCommand());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (status === "loading") {
@@ -82,38 +71,20 @@ export default function SetupPage() {
             </div>
 
             <div className="mb-6">
-              <p className="text-gray-400 text-sm mb-3">
-                <span className="text-white font-medium">Step 1:</span> Run this once to set up:
-              </p>
+              <p className="text-gray-400 text-sm mb-3">Run this command to sync:</p>
               <div
-                className="bg-[#0a0a0f] border border-[#2a2a3e] rounded-lg p-4 font-mono text-sm cursor-pointer hover:bg-[#0f0f18] transition-colors"
-                onClick={copySetupCommand}
+                className="bg-[#0a0a0f] border border-[#2a2a3e] rounded-lg p-4 font-mono text-xs break-all cursor-pointer hover:bg-[#0f0f18] transition-colors"
+                onClick={copyToClipboard}
               >
-                <code className="text-indigo-400">{getSetupCommand()}</code>
+                <code className="text-indigo-400">{getCommand()}</code>
               </div>
               <p className="text-gray-500 text-xs mt-2">
-                {copiedSetup ? "✓ Copied!" : "Click to copy"}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-gray-400 text-sm mb-3">
-                <span className="text-white font-medium">Step 2:</span> Sync your usage:
-              </p>
-              <div
-                className="bg-[#0a0a0f] border border-[#2a2a3e] rounded-lg p-4 font-mono text-sm cursor-pointer hover:bg-[#0f0f18] transition-colors"
-                onClick={copySyncCommand}
-              >
-                <code className="text-indigo-400">{getSyncCommand()}</code>
-              </div>
-              <p className="text-gray-500 text-xs mt-2">
-                {copiedSync ? "✓ Copied!" : "Click to copy"}
+                {copied ? "✓ Copied!" : "Click to copy"}
               </p>
             </div>
 
             <div className="text-gray-400 text-sm">
-              <p>After setup, your usage syncs automatically after each Claude Code session.</p>
-              <p className="mt-1">You can also run <code className="text-indigo-400">npx github:Kisum/ccrank sync</code> anytime to sync manually.</p>
+              <p>Run this anytime to update your stats on the leaderboard.</p>
             </div>
 
             <div className="mt-6 pt-4 border-t border-[#2a2a3e]">

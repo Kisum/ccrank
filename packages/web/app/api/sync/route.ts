@@ -21,6 +21,26 @@ interface SyncRequestBody {
   entries?: StatsEntry[];
 }
 
+/**
+ * Convert a local date string to UTC date string given a timezone offset.
+ * @param localDate - Date in YYYY-MM-DD format (user's local date)
+ * @param tzOffset - Timezone offset string like "+0800" or "-0500"
+ */
+function localDateToUtcDate(localDate: string, tzOffset: string): string {
+  const [year, month, day] = localDate.split("-").map(Number);
+  // Parse timezone offset (e.g., "+0800" -> +480 minutes, "-0500" -> -300 minutes)
+  const sign = tzOffset.startsWith("-") ? -1 : 1;
+  const hours = parseInt(tzOffset.slice(-4, -2), 10);
+  const minutes = parseInt(tzOffset.slice(-2), 10);
+  const offsetMinutes = sign * (hours * 60 + minutes);
+
+  // Create date at noon local time to avoid DST edge cases
+  const localDateTime = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  // Subtract offset to get UTC (offset is minutes ahead of UTC)
+  localDateTime.setUTCMinutes(localDateTime.getUTCMinutes() - offsetMinutes);
+  return localDateTime.toISOString().split("T")[0];
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get username from query param
@@ -31,6 +51,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Get optional timezone offset (e.g., "+0800", "-0500")
+    const tzOffset = request.nextUrl.searchParams.get("tz");
 
     // Parse request body
     let body: SyncRequestBody;
@@ -87,19 +110,39 @@ export async function POST(request: NextRequest) {
       displayName: username,
     });
 
+    // Parse timezone offset to minutes if provided
+    let timezoneOffsetMinutes: number | undefined;
+    if (tzOffset) {
+      const sign = tzOffset.startsWith("-") ? -1 : 1;
+      const hours = parseInt(tzOffset.slice(-4, -2), 10);
+      const minutes = parseInt(tzOffset.slice(-2), 10);
+      timezoneOffsetMinutes = sign * (hours * 60 + minutes);
+    }
+
     // Format entries for the Convex mutation
-    const statsEntries = entries.map((entry) => ({
-      date: entry.date,
-      utcDate: entry.utcDate, // May be undefined for legacy data
-      timezoneOffset: entry.timezoneOffset, // May be undefined for legacy data
-      inputTokens: entry.inputTokens || 0,
-      outputTokens: entry.outputTokens || 0,
-      cacheCreationTokens: entry.cacheCreationTokens || 0,
-      cacheReadTokens: entry.cacheReadTokens || 0,
-      totalTokens: entry.totalTokens || 0,
-      totalCost: entry.totalCost || 0,
-      modelsUsed: entry.modelsUsed || [],
-    }));
+    const statsEntries = entries.map((entry) => {
+      // Compute utcDate if not provided but we have timezone info
+      let utcDate = entry.utcDate;
+      let timezoneOffset = entry.timezoneOffset;
+
+      if (!utcDate && tzOffset) {
+        utcDate = localDateToUtcDate(entry.date, tzOffset);
+        timezoneOffset = timezoneOffsetMinutes;
+      }
+
+      return {
+        date: entry.date,
+        utcDate,
+        timezoneOffset,
+        inputTokens: entry.inputTokens || 0,
+        outputTokens: entry.outputTokens || 0,
+        cacheCreationTokens: entry.cacheCreationTokens || 0,
+        cacheReadTokens: entry.cacheReadTokens || 0,
+        totalTokens: entry.totalTokens || 0,
+        totalCost: entry.totalCost || 0,
+        modelsUsed: entry.modelsUsed || [],
+      };
+    });
 
     // Call the batch record stats mutation
     const result = await convex.mutation(api.stats.batchRecordStats, {
