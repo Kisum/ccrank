@@ -22,8 +22,8 @@ interface SyncRequestBody {
 }
 
 // Maximum reasonable values for validation
-const MAX_DAILY_TOKENS = 100_000_000; // 100M tokens per day
-const MAX_DAILY_COST = 10_000; // $10,000 per day
+const MAX_DAILY_TOKENS = 1_000_000_000; // 1B tokens per day
+const MAX_DAILY_COST = 100_000; // $100,000 per day
 
 /**
  * Validate a single stats entry

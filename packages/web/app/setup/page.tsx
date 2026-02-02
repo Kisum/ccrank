@@ -26,34 +26,52 @@ export default function SetupPage() {
 
   const [copied, setCopied] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showKey, setShowKey] = useState(false);
 
-  // Check for stored API key on mount
+  // Auto-generate API key when user signs in
   useEffect(() => {
-    if (username) {
-      const storedKey = localStorage.getItem(`ccusage_api_key_${username.toLowerCase()}`);
-      if (storedKey) {
-        setApiKey(storedKey);
+    if (!session?.user || !username) return;
+
+    // Check localStorage first
+    const storedKey = localStorage.getItem(`ccusage_api_key_${username.toLowerCase()}`);
+    if (storedKey) {
+      setApiKey(storedKey);
+      return;
+    }
+
+    // No stored key - auto-generate one
+    const generateKey = async () => {
+      setIsGenerating(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/keys/generate", {
+          method: "POST",
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to generate API key");
+        }
+
+        const result = data as KeyGenResult;
+        setApiKey(result.apiKey);
+
+        // Store in localStorage
+        localStorage.setItem(`ccusage_api_key_${username.toLowerCase()}`, result.apiKey);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to generate API key");
+      } finally {
+        setIsGenerating(false);
       }
-    }
-  }, [username]);
+    };
 
-  // Check API key status when session is available
-  useEffect(() => {
-    if (session?.user && username) {
-      fetch("/api/keys/generate")
-        .then((res) => res.json())
-        .then((data: KeyStatus) => {
-          setKeyStatus(data);
-        })
-        .catch(console.error);
-    }
+    generateKey();
   }, [session, username]);
 
-  const generateApiKey = useCallback(async () => {
+  const regenerateApiKey = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
 
@@ -70,17 +88,9 @@ export default function SetupPage() {
 
       const result = data as KeyGenResult;
       setApiKey(result.apiKey);
-      setShowKey(true);
 
-      // Store in localStorage for convenience
+      // Store in localStorage
       localStorage.setItem(`ccusage_api_key_${username.toLowerCase()}`, result.apiKey);
-
-      // Update key status
-      setKeyStatus({
-        hasKey: true,
-        keyPrefix: result.keyPrefix,
-        username: result.username,
-      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate API key");
     } finally {
@@ -180,35 +190,12 @@ export default function SetupPage() {
                 </div>
               )}
 
-              {!apiKey ? (
-                <div className="mb-6">
-                  <p className="text-gray-600 text-sm mb-4">
-                    Generate an API key to sync your Claude Code usage to the leaderboard.
-                    {keyStatus?.hasKey && (
-                      <span className="block mt-1 text-amber-600">
-                        You have an existing key (prefix: {keyStatus.keyPrefix}...). Generating a new one will revoke it.
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    onClick={generateApiKey}
-                    disabled={isGenerating}
-                    className="px-4 py-2 bg-[#CCFF6F] hover:bg-[#b8e65f] text-black font-medium transition-colors disabled:opacity-50"
-                  >
-                    {isGenerating ? "Generating..." : "Generate API Key"}
-                  </button>
+              {isGenerating ? (
+                <div className="mb-6 text-center py-4">
+                  <p className="text-gray-600 text-sm">Generating your API key...</p>
                 </div>
-              ) : (
+              ) : apiKey ? (
                 <>
-                  {showKey && (
-                    <div className="mb-4 p-3 bg-green-50 border border-green-200">
-                      <p className="text-green-800 text-sm font-medium mb-2">
-                        API Key Generated! Save it securely - it won&apos;t be shown again.
-                      </p>
-                      <code className="text-xs text-green-700 break-all">{apiKey}</code>
-                    </div>
-                  )}
-
                   <div className="mb-6">
                     <p className="text-gray-600 text-sm mb-3">Run this command to sync:</p>
                     <div
@@ -225,13 +212,9 @@ export default function SetupPage() {
                   <div className="text-gray-600 text-sm space-y-2">
                     <p>Run this anytime to update your stats on the leaderboard.</p>
                     <p className="text-xs text-gray-500">
-                      Your API key is stored locally. To generate a new key (revoking the old one),{" "}
+                      To rotate your API key,{" "}
                       <button
-                        onClick={() => {
-                          localStorage.removeItem(`ccusage_api_key_${username.toLowerCase()}`);
-                          setApiKey(null);
-                          setShowKey(false);
-                        }}
+                        onClick={regenerateApiKey}
                         className="text-blue-600 hover:underline"
                       >
                         click here
@@ -240,7 +223,7 @@ export default function SetupPage() {
                     </p>
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </div>
