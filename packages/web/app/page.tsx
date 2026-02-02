@@ -55,7 +55,7 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-[#e0e0e0]">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <Image
               src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
               alt="Rye logo"
@@ -64,7 +64,7 @@ export default function Home() {
               className="w-10 h-10"
             />
             <h1 className="text-xl font-bold text-black">Claude Code Usage Leaderboard</h1>
-          </div>
+          </a>
 
           <a
             href="/setup"

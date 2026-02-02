@@ -15,7 +15,7 @@ export default function SetupPage() {
 
   const getCommand = () => {
     const user = username || "YOUR_GITHUB_USERNAME";
-    return `npx ccusage@latest --json | curl -s -X POST "https://ccusageshare-leaderboard.vercel.app/api/sync?user=${encodeURIComponent(user)}&tz=$(date +%z)" -H "Content-Type: application/json" -d @-`;
+    return `npx ccusage@latest --json 2>/dev/null | curl -s -X POST "https://ccusageshare-leaderboard.vercel.app/api/sync?user=${encodeURIComponent(user)}&tz=$(date +%z)" -H "Content-Type: application/json" -d @-`;
   };
 
   const copyToClipboard = () => {
@@ -37,7 +37,7 @@ export default function SetupPage() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-[#e0e0e0]">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <Image
               src="https://media.licdn.com/dms/image/v2/D4E0BAQHepn-93K0ntg/company-logo_200_200/B4EZiEuaY_GcAI-/0/1754573416289/rye_logo?e=2147483647&v=beta&t=-SpDi-JH-E3R2SCJ-jaP-1qv15Ciyhq0ItgKJRE4GDY"
               alt="Rye logo"
@@ -46,7 +46,7 @@ export default function SetupPage() {
               className="w-10 h-10"
             />
             <h1 className="text-xl font-bold text-black">Claude Code Usage Leaderboard</h1>
-          </div>
+          </Link>
 
           <Link
             href="/"
@@ -61,7 +61,7 @@ export default function SetupPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="max-w-xl w-full">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-black mb-2">sync usage rye Setup</h1>
+            <h1 className="text-3xl font-bold text-black mb-2">Sync Usage</h1>
             <p className="text-gray-600">Sync your Claude Code usage to the leaderboard</p>
           </div>
 

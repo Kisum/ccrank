@@ -55,15 +55,62 @@ export async function POST(request: NextRequest) {
     // Get optional timezone offset (e.g., "+0800", "-0500")
     const tzOffset = request.nextUrl.searchParams.get("tz");
 
-    // Parse request body
+    // Parse request body - read raw text first for better error messages
     let body: SyncRequestBody;
+    let rawBody: string;
     try {
-      body = await request.json();
+      rawBody = await request.text();
     } catch {
       return NextResponse.json(
-        { error: "Invalid JSON body" },
+        { error: "Failed to read request body" },
         { status: 400 }
       );
+    }
+
+    // Handle empty body case
+    if (!rawBody || rawBody.trim() === "") {
+      return NextResponse.json(
+        {
+          error: "Empty body received - ccusage may not have produced any output. " +
+            "Make sure ccusage ran successfully and produced JSON output before piping to curl.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Try to parse JSON, with fallback to extract JSON from mixed content
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      // Try to find JSON object in the content (npx might print warnings before the JSON)
+      const jsonMatch = rawBody.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          body = JSON.parse(jsonMatch[0]);
+        } catch {
+          const preview = rawBody.slice(0, 100);
+          return NextResponse.json(
+            {
+              error: "Invalid JSON body - found JSON-like content but failed to parse it",
+              hint: "Check that ccusage is outputting valid JSON. You may have stderr mixed with stdout.",
+              received_preview: preview + (rawBody.length > 100 ? "..." : ""),
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        const preview = rawBody.slice(0, 100);
+        return NextResponse.json(
+          {
+            error: "Invalid JSON body - no JSON object found in request",
+            hint: rawBody.includes("npm") || rawBody.includes("npx")
+              ? "It looks like npm/npx output was captured. Try redirecting stderr: npx ccusage@latest --json 2>/dev/null | curl ..."
+              : "Make sure ccusage outputs valid JSON. Run 'npx ccusage@latest --json' alone to verify the output.",
+            received_preview: preview + (rawBody.length > 100 ? "..." : ""),
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Accept both 'daily' (ccusage format) and 'entries' (legacy format)
