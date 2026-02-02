@@ -1,22 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import Leaderboard from "@/components/Leaderboard";
 import LeaderboardTabs, { type Period } from "@/components/LeaderboardTabs";
-
-// Dynamic import to avoid SSR issues with recharts
-const UsageChart = dynamic(() => import("@/components/UsageChart"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-64 bg-[#f5f5f5] border border-[#e0e0e0] flex items-center justify-center">
-      <span className="text-gray-400">Loading chart...</span>
-    </div>
-  ),
-});
 
 // Format large numbers (e.g., 2400000 -> "2.4M")
 function formatTokens(tokens: number): string {
@@ -116,12 +105,6 @@ export default function Home() {
             value={stats ? stats.totalUsers.toString() : "--"}
             subValue="tracking usage"
           />
-        </div>
-
-        {/* Daily Usage Chart */}
-        <div className="bg-white border border-[#e0e0e0] p-4 md:p-6 mb-8">
-          <h3 className="text-lg font-semibold text-black mb-4">Daily Usage</h3>
-          <UsageChart period={period} />
         </div>
 
         {/* Tabs */}
