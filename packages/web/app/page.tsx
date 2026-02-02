@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import Leaderboard from "@/components/Leaderboard";
 import LeaderboardTabs, { type Period } from "@/components/LeaderboardTabs";
+import UsageChart from "@/components/UsageChart";
 
 // Format large numbers (e.g., 2400000 -> "2.4M")
 function formatTokens(tokens: number): string {
@@ -105,6 +106,12 @@ export default function Home() {
             value={stats ? stats.totalUsers.toString() : "--"}
             subValue="tracking usage"
           />
+        </div>
+
+        {/* Daily Usage Chart */}
+        <div className="bg-white border border-[#e0e0e0] p-4 md:p-6 mb-8">
+          <h3 className="text-lg font-semibold text-black mb-4">Daily Usage</h3>
+          <UsageChart period={period} />
         </div>
 
         {/* Tabs */}

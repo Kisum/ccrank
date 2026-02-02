@@ -324,6 +324,92 @@ export const getLeaderboardByDateRange = query({
 });
 
 /**
+ * Get daily usage data for chart visualization.
+ * Returns aggregated usage per day for the specified period.
+ */
+export const getDailyUsageChart = query({
+  args: {
+    period: v.union(
+      v.literal("daily"),
+      v.literal("weekly"),
+      v.literal("monthly"),
+      v.literal("alltime")
+    ),
+  },
+  handler: async (ctx, args) => {
+    let startDate: string;
+    let endDate: string;
+    const tomorrow = getTomorrow();
+
+    switch (args.period) {
+      case "daily":
+        startDate = getDaysAgo(1);
+        endDate = tomorrow;
+        break;
+      case "weekly":
+        startDate = getDaysAgo(7);
+        endDate = tomorrow;
+        break;
+      case "monthly":
+        startDate = getDaysAgo(30);
+        endDate = tomorrow;
+        break;
+      case "alltime":
+        startDate = getDaysAgo(90); // Limit to last 90 days for chart readability
+        endDate = tomorrow;
+        break;
+    }
+
+    // Get all daily stats in the date range
+    const allStats = await ctx.db.query("dailyStats").collect();
+
+    // Filter by date range using UTC date when available
+    const filteredStats = allStats.filter((s: Doc<"dailyStats">) => {
+      const effectiveDate = getEffectiveDate(s);
+      return effectiveDate >= startDate && effectiveDate <= endDate;
+    });
+
+    // Group stats by date and aggregate
+    const dailyAggregates = new Map<
+      string,
+      {
+        totalTokens: number;
+        totalCost: number;
+        uniqueUsers: Set<string>;
+      }
+    >();
+
+    for (const stat of filteredStats) {
+      const effectiveDate = getEffectiveDate(stat);
+      const existing = dailyAggregates.get(effectiveDate);
+      if (existing) {
+        existing.totalTokens += stat.totalTokens;
+        existing.totalCost += stat.totalCost;
+        existing.uniqueUsers.add(stat.userId);
+      } else {
+        dailyAggregates.set(effectiveDate, {
+          totalTokens: stat.totalTokens,
+          totalCost: stat.totalCost,
+          uniqueUsers: new Set([stat.userId]),
+        });
+      }
+    }
+
+    // Convert to sorted array
+    const chartData = Array.from(dailyAggregates.entries())
+      .map(([date, data]) => ({
+        date,
+        totalTokens: data.totalTokens,
+        totalCost: Math.round(data.totalCost * 100) / 100, // Round to 2 decimals
+        activeUsers: data.uniqueUsers.size,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return chartData;
+  },
+});
+
+/**
  * Get stats summary for a specific period.
  */
 export const getStatsSummary = query({
