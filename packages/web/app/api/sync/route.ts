@@ -21,6 +21,63 @@ interface SyncRequestBody {
   entries?: StatsEntry[];
 }
 
+// Maximum reasonable values for validation
+const MAX_DAILY_TOKENS = 100_000_000; // 100M tokens per day
+const MAX_DAILY_COST = 10_000; // $10,000 per day
+
+/**
+ * Validate a single stats entry
+ */
+function validateStatsEntry(entry: StatsEntry): { valid: boolean; error?: string } {
+  // Check for negative values
+  if (entry.inputTokens < 0 || entry.outputTokens < 0 ||
+      entry.cacheCreationTokens < 0 || entry.cacheReadTokens < 0 ||
+      entry.totalTokens < 0 || entry.totalCost < 0) {
+    return { valid: false, error: "Token counts and costs cannot be negative" };
+  }
+
+  // Check for unreasonably large values
+  if (entry.totalTokens > MAX_DAILY_TOKENS) {
+    return { valid: false, error: `Total tokens exceeds maximum allowed (${MAX_DAILY_TOKENS})` };
+  }
+
+  if (entry.totalCost > MAX_DAILY_COST) {
+    return { valid: false, error: `Total cost exceeds maximum allowed ($${MAX_DAILY_COST})` };
+  }
+
+  // Check for NaN or Infinity
+  if (!Number.isFinite(entry.totalTokens) || !Number.isFinite(entry.totalCost)) {
+    return { valid: false, error: "Token counts and costs must be finite numbers" };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate username format - only allow safe characters
+ */
+function validateUsername(username: string): { valid: boolean; error?: string } {
+  // Username must be 1-39 characters (GitHub limit)
+  if (username.length < 1 || username.length > 39) {
+    return { valid: false, error: "Username must be between 1 and 39 characters" };
+  }
+
+  // Only allow alphanumeric, hyphens (GitHub username rules)
+  // GitHub usernames can only contain alphanumeric characters or hyphens
+  // Cannot start or end with hyphen, no consecutive hyphens
+  const validUsernamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+  if (!validUsernamePattern.test(username)) {
+    return { valid: false, error: "Username contains invalid characters. Only alphanumeric and hyphens allowed." };
+  }
+
+  // Check for consecutive hyphens (not allowed in GitHub usernames)
+  if (username.includes("--")) {
+    return { valid: false, error: "Username cannot contain consecutive hyphens" };
+  }
+
+  return { valid: true };
+}
+
 /**
  * Convert a local date string to UTC date string given a timezone offset.
  * @param localDate - Date in YYYY-MM-DD format (user's local date)
@@ -43,11 +100,63 @@ function localDateToUtcDate(localDate: string, tzOffset: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get username from query param
-    const username = request.nextUrl.searchParams.get("user");
-    if (!username) {
+    // Require API key authentication
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
-        { error: "Missing 'user' query parameter" },
+        {
+          error: "Authentication required",
+          hint: "Include your API key in the Authorization header: -H 'Authorization: Bearer YOUR_API_KEY'"
+        },
+        { status: 401 }
+      );
+    }
+
+    const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
+    const convex = getConvexClient();
+
+    // Validate API key and get associated user
+    const keyValidation = await convex.query(api.apiKeys.validateApiKey, { apiKey });
+    if (!keyValidation) {
+      return NextResponse.json(
+        { error: "Invalid or revoked API key" },
+        { status: 401 }
+      );
+    }
+
+    // Get the user associated with this API key
+    const user = await convex.query(api.users.getUserById, { userId: keyValidation.userId });
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 401 }
+      );
+    }
+
+    // The authenticated user's username (from GitHub OAuth)
+    const authenticatedUsername = user.githubUsername || user.displayName || "";
+
+    // Get username from query param (optional - will use authenticated user if not provided)
+    const requestedUsername = request.nextUrl.searchParams.get("user");
+
+    // If a username is provided, it must match the authenticated user
+    if (requestedUsername && requestedUsername.toLowerCase() !== authenticatedUsername.toLowerCase()) {
+      return NextResponse.json(
+        {
+          error: "Username mismatch",
+          hint: `You can only sync stats for your own account (@${authenticatedUsername})`
+        },
+        { status: 403 }
+      );
+    }
+
+    const username = authenticatedUsername;
+
+    // Validate username format
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.valid) {
+      return NextResponse.json(
+        { error: usernameValidation.error },
         { status: 400 }
       );
     }
@@ -145,17 +254,19 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Validate stats values
+      const statsValidation = validateStatsEntry(entry);
+      if (!statsValidation.valid) {
+        return NextResponse.json(
+          { error: `Invalid stats for ${entry.date}: ${statsValidation.error}` },
+          { status: 400 }
+        );
+      }
     }
 
-    const convex = getConvexClient();
-
-    // Get or create user by username
-    const odId = `user_${username.toLowerCase().replace(/\s+/g, "_")}`;
-    const userId = await convex.mutation(api.users.getOrCreateUser, {
-      slackUserId: odId,
-      slackTeamId: "web",
-      displayName: username,
-    });
+    // Use the already-authenticated user ID
+    const userId = keyValidation.userId as Id<"users">;
 
     // Parse timezone offset to minutes if provided
     let timezoneOffsetMinutes: number | undefined;
@@ -219,7 +330,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
   });
 }

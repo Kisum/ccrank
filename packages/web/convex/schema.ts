@@ -2,15 +2,18 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Users registered via Slack
+  // Users registered via Slack or GitHub OAuth
   users: defineTable({
     slackUserId: v.string(),
     slackTeamId: v.string(),
     displayName: v.optional(v.string()),
+    githubId: v.optional(v.string()), // GitHub user ID for OAuth users
+    githubUsername: v.optional(v.string()), // GitHub username
     createdAt: v.number(),
   })
     .index("by_slack_id", ["slackUserId", "slackTeamId"])
-    .index("by_team", ["slackTeamId"]),
+    .index("by_team", ["slackTeamId"])
+    .index("by_github_id", ["githubId"]),
 
   // Daily usage statistics for each user
   dailyStats: defineTable({

@@ -10,6 +10,13 @@ interface LeaderboardProps {
 
 // Format large numbers (e.g., 2400000 -> "2.4M")
 function formatTokens(tokens: number): string {
+  // Handle invalid numbers
+  if (!Number.isFinite(tokens) || tokens > 999_999_999_999) {
+    return "-";
+  }
+  if (tokens < 0) {
+    return "0";
+  }
   if (tokens >= 1_000_000_000) {
     return `${(tokens / 1_000_000_000).toFixed(1)}B`;
   }
@@ -24,7 +31,29 @@ function formatTokens(tokens: number): string {
 
 // Format cost (e.g., 156.8 -> "$156.80")
 function formatCost(cost: number): string {
+  // Handle edge cases for very large or very small numbers
+  if (!Number.isFinite(cost) || cost > 99999999) {
+    return "$-.--";
+  }
+  if (cost < 0) {
+    return "$0.00";
+  }
   return `$${cost.toFixed(2)}`;
+}
+
+// Sanitize username to prevent XSS and ensure safe display
+function sanitizeUsername(username: string): string {
+  // Only allow alphanumeric, hyphens, and underscores
+  const sanitized = username.replace(/[^a-zA-Z0-9_-]/g, "");
+  // Limit length
+  return sanitized.slice(0, 39) || "unknown";
+}
+
+// Check if username is valid for linking to GitHub
+function isValidGitHubUsername(username: string): boolean {
+  // GitHub usernames: alphanumeric and hyphens, 1-39 chars, no consecutive hyphens
+  const pattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
+  return pattern.test(username) && !username.includes("--");
 }
 
 // Get rank display with medals for top 3
@@ -164,8 +193,10 @@ function LeaderboardContent({
       {/* Leaderboard entries */}
       <div className="space-y-2">
         {leaderboard.map((entry) => {
-          const username =
+          const rawUsername =
             entry.displayName || `User ${entry.slackUserId.slice(-4)}`;
+          const username = sanitizeUsername(rawUsername);
+          const canLink = isValidGitHubUsername(username);
           return (
             <div
               key={`${entry.rank}-${entry.slackUserId}`}
@@ -183,14 +214,20 @@ function LeaderboardContent({
 
               {/* Username */}
               <div className="flex-1 min-w-0">
-                <a
-                  href={`https://github.com/${username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium truncate block hover:underline text-black"
-                >
-                  @{username}
-                </a>
+                {canLink ? (
+                  <a
+                    href={`https://github.com/${encodeURIComponent(username)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium truncate block hover:underline text-black"
+                  >
+                    @{username}
+                  </a>
+                ) : (
+                  <span className="font-medium truncate block text-black">
+                    @{username}
+                  </span>
+                )}
               </div>
 
               {/* Tokens */}

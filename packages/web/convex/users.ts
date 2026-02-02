@@ -106,3 +106,60 @@ export const updateDisplayName = mutation({
     });
   },
 });
+
+/**
+ * Get or create a user from GitHub OAuth data.
+ */
+export const getOrCreateGitHubUser = mutation({
+  args: {
+    githubId: v.string(),
+    githubUsername: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if user already exists by GitHub ID
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_github_id", (q) => q.eq("githubId", args.githubId))
+      .unique();
+
+    if (existingUser) {
+      // Update username if changed
+      if (args.githubUsername !== existingUser.githubUsername) {
+        await ctx.db.patch(existingUser._id, {
+          githubUsername: args.githubUsername,
+          displayName: args.githubUsername,
+        });
+      }
+      return existingUser._id;
+    }
+
+    // Create new user with GitHub OAuth identity
+    const userId = await ctx.db.insert("users", {
+      slackUserId: `github_${args.githubId}`,
+      slackTeamId: "github",
+      displayName: args.githubUsername,
+      githubId: args.githubId,
+      githubUsername: args.githubUsername,
+      createdAt: Date.now(),
+    });
+
+    return userId;
+  },
+});
+
+/**
+ * Get a user by their GitHub ID.
+ */
+export const getUserByGitHubId = query({
+  args: {
+    githubId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_github_id", (q) => q.eq("githubId", args.githubId))
+      .unique();
+
+    return user;
+  },
+});

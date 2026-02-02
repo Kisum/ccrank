@@ -1,6 +1,40 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+// Maximum reasonable values for validation
+const MAX_DAILY_TOKENS = 100_000_000; // 100M tokens per day is extremely high
+const MAX_DAILY_COST = 10_000; // $10,000 per day is extremely high
+
+/**
+ * Validate stats entry values are within reasonable bounds.
+ */
+function validateStatsEntry(entry: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  totalCost: number;
+}): { valid: boolean; error?: string } {
+  // Check for negative values
+  if (entry.inputTokens < 0 || entry.outputTokens < 0 ||
+      entry.cacheCreationTokens < 0 || entry.cacheReadTokens < 0 ||
+      entry.totalTokens < 0 || entry.totalCost < 0) {
+    return { valid: false, error: "Token counts and costs cannot be negative" };
+  }
+
+  // Check for unreasonably large values
+  if (entry.totalTokens > MAX_DAILY_TOKENS) {
+    return { valid: false, error: `Total tokens exceeds maximum allowed (${MAX_DAILY_TOKENS})` };
+  }
+
+  if (entry.totalCost > MAX_DAILY_COST) {
+    return { valid: false, error: `Total cost exceeds maximum allowed ($${MAX_DAILY_COST})` };
+  }
+
+  return { valid: true };
+}
+
 /**
  * Record or update daily stats for a user.
  * Uses upsert pattern - updates existing record or creates new one.
@@ -127,6 +161,14 @@ export const batchRecordStats = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    // Validate all stats entries before processing
+    for (const stat of args.stats) {
+      const validation = validateStatsEntry(stat);
+      if (!validation.valid) {
+        throw new Error(`Invalid stats entry for ${stat.date}: ${validation.error}`);
+      }
+    }
+
     const now = Date.now();
 
     // Delete all existing stats for this user
@@ -194,6 +236,114 @@ export const deleteStatsByDisplayName = mutation({
     }
 
     return { success: true, deleted: stats.length, userId: user._id };
+  },
+});
+
+/**
+ * Clean up fake/malicious users and their stats.
+ * Removes users with XSS attempts, ridiculous values, or suspicious patterns.
+ */
+export const cleanupFakeData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Patterns that indicate XSS attempts or malicious usernames
+    const suspiciousPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /onclick/i,
+      /onerror/i,
+      /onload/i,
+      /<svg/i,
+      /<img/i,
+      /\.\.\//,  // Path traversal
+      /alert\(/i,
+      /eval\(/i,
+    ];
+
+    const allUsers = await ctx.db.query("users").collect();
+    const deletedUsers: string[] = [];
+    const deletedStats: number[] = [];
+
+    for (const user of allUsers) {
+      let shouldDelete = false;
+      const displayName = user.displayName || "";
+
+      // Check for suspicious username patterns
+      for (const pattern of suspiciousPatterns) {
+        if (pattern.test(displayName)) {
+          shouldDelete = true;
+          break;
+        }
+      }
+
+      // Check for ridiculous stats (tokens > 10B or cost > $100k total)
+      if (!shouldDelete) {
+        const userStats = await ctx.db
+          .query("dailyStats")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        let totalTokens = 0;
+        let totalCost = 0;
+
+        for (const stat of userStats) {
+          totalTokens += stat.totalTokens;
+          totalCost += stat.totalCost;
+        }
+
+        // Flag if total tokens > 10B or cost > $100k (these are absurd for any real user)
+        if (totalTokens > 10_000_000_000 || totalCost > 100_000) {
+          shouldDelete = true;
+        }
+
+        // Also flag if any single stat entry is ridiculous
+        for (const stat of userStats) {
+          if (stat.totalTokens > MAX_DAILY_TOKENS || stat.totalCost > MAX_DAILY_COST) {
+            shouldDelete = true;
+            break;
+          }
+          // Flag negative values
+          if (stat.totalTokens < 0 || stat.totalCost < 0) {
+            shouldDelete = true;
+            break;
+          }
+        }
+      }
+
+      if (shouldDelete) {
+        // Delete all stats for this user
+        const userStats = await ctx.db
+          .query("dailyStats")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        for (const stat of userStats) {
+          await ctx.db.delete(stat._id);
+        }
+        deletedStats.push(userStats.length);
+
+        // Delete any API keys for this user
+        const userKeys = await ctx.db
+          .query("apiKeys")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        for (const key of userKeys) {
+          await ctx.db.delete(key._id);
+        }
+
+        // Delete the user
+        await ctx.db.delete(user._id);
+        deletedUsers.push(displayName);
+      }
+    }
+
+    return {
+      success: true,
+      deletedUsers,
+      deletedUsersCount: deletedUsers.length,
+      totalStatsDeleted: deletedStats.reduce((a, b) => a + b, 0),
+    };
   },
 });
 
