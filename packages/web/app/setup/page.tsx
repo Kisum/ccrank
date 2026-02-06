@@ -28,6 +28,10 @@ export default function SetupPage() {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reportUploading, setReportUploading] = useState(false);
+  const [reportUploaded, setReportUploaded] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Auto-generate API key when user signs in
   useEffect(() => {
@@ -110,6 +114,38 @@ export default function SetupPage() {
     navigator.clipboard.writeText(getCommand());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleReportFile = async (file: File) => {
+    setReportError(null);
+    setReportUploading(true);
+
+    try {
+      const text = await file.text();
+      if (!text.includes("Claude Code Insights")) {
+        throw new Error("This doesn't look like a Claude Code /insights report");
+      }
+      if (text.length > 500_000) {
+        throw new Error("Report file is too large (max 500KB)");
+      }
+
+      const res = await fetch("/api/report/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportHtml: text }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to upload report");
+      }
+
+      setReportUploaded(true);
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : "Failed to upload report");
+    } finally {
+      setReportUploading(false);
+    }
   };
 
   if (status === "loading") {
@@ -224,6 +260,80 @@ export default function SetupPage() {
                   </div>
                 </>
               ) : null}
+
+              {/* Insights Report Upload */}
+              <div className="mt-6 bg-white border border-[#e0e0e0] p-6">
+                <h2 className="text-lg font-bold text-black mb-1">Upload Insights Report</h2>
+                <p className="text-gray-600 text-sm mb-4">
+                  Drag & drop your Claude Code <code className="bg-white px-1.5 py-0.5 border border-[#e0e0e0] text-xs">/insights</code> report to share it on the leaderboard
+                </p>
+
+                {reportUploaded ? (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 mx-auto mb-3 bg-[#CCFF6F] flex items-center justify-center">
+                      <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p className="text-black font-medium mb-2">Report uploaded!</p>
+                    <a
+                      href={`/report/${encodeURIComponent(username.toLowerCase())}`}
+                      className="text-sm font-medium text-black bg-[#CCFF6F] hover:bg-[#b8e65f] px-4 py-2 inline-block border border-[#CCFF6F] transition-colors"
+                    >
+                      View your report
+                    </a>
+                  </div>
+                ) : (
+                  <div
+                    className={`border-2 border-dashed p-8 text-center transition-colors cursor-pointer ${
+                      isDragging
+                        ? "border-[#CCFF6F] bg-[#CCFF6F]/10"
+                        : "border-[#e0e0e0] hover:border-gray-400"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files[0];
+                      if (file) handleReportFile(file);
+                    }}
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = ".html";
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) handleReportFile(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    {reportUploading ? (
+                      <div>
+                        <div className="w-8 h-8 mx-auto mb-3 border-2 border-gray-300 border-t-black animate-spin rounded-full" />
+                        <p className="text-gray-600 text-sm">Uploading report...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <svg className="w-10 h-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-gray-600 text-sm mb-1">
+                          {isDragging ? "Drop your report here" : "Drag & drop your report.html here"}
+                        </p>
+                        <p className="text-gray-400 text-xs">or click to browse</p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {reportError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
+                    {reportError}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

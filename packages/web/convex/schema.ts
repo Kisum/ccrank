@@ -48,6 +48,13 @@ export default defineSchema({
     .index("by_hash", ["keyHash"])
     .index("by_prefix", ["keyPrefix"]),
 
+  // Insights reports uploaded by users
+  insightsReports: defineTable({
+    userId: v.id("users"),
+    reportHtml: v.string(),
+    uploadedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   // Slack workspace installations
   slackWorkspaces: defineTable({
     teamId: v.string(),

@@ -115,26 +115,17 @@ export async function POST(request: NextRequest) {
     const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
     const convex = getConvexClient();
 
-    // Validate API key and get associated user
-    const keyValidation = await convex.query(api.apiKeys.validateApiKey, { apiKey });
-    if (!keyValidation) {
+    // Validate API key and get associated user in a single query
+    const validation = await convex.query(api.apiKeys.validateApiKeyWithUser, { apiKey });
+    if (!validation) {
       return NextResponse.json(
         { error: "Invalid or revoked API key" },
         { status: 401 }
       );
     }
 
-    // Get the user associated with this API key
-    const user = await convex.query(api.users.getUserById, { userId: keyValidation.userId });
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 401 }
-      );
-    }
-
     // The authenticated user's username (from GitHub OAuth)
-    const authenticatedUsername = user.githubUsername || user.displayName || "";
+    const authenticatedUsername = validation.user.githubUsername || validation.user.displayName || "";
 
     // Get username from query param (optional - will use authenticated user if not provided)
     const requestedUsername = request.nextUrl.searchParams.get("user");
@@ -266,7 +257,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use the already-authenticated user ID
-    const userId = keyValidation.userId as Id<"users">;
+    const userId = validation.userId as Id<"users">;
 
     // Parse timezone offset to minutes if provided
     let timezoneOffsetMinutes: number | undefined;

@@ -9,6 +9,7 @@
  */
 
 import type * as apiKeys from "../apiKeys.js";
+import type * as insightsReports from "../insightsReports.js";
 import type * as leaderboard from "../leaderboard.js";
 import type * as slack from "../slack.js";
 import type * as stats from "../stats.js";
@@ -22,6 +23,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
+  insightsReports: typeof insightsReports;
   leaderboard: typeof leaderboard;
   slack: typeof slack;
   stats: typeof stats;

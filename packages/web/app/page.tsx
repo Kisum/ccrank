@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import Leaderboard from "@/components/Leaderboard";
 import LeaderboardTabs, { type Period } from "@/components/LeaderboardTabs";
+import MemberUsageChart from "@/components/MemberUsageChart";
 
 // Format large numbers (e.g., 2400000 -> "2.4M")
 function formatTokens(tokens: number): string {
@@ -24,6 +25,23 @@ function formatTokens(tokens: number): string {
 // Format cost (e.g., 156.8 -> "$156.80")
 function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
+}
+
+const CLAUDE_MAX_MONTHLY_COST = 200;
+
+function getPeriodDays(period: Period): number {
+  switch (period) {
+    case "daily": return 1;
+    case "weekly": return 7;
+    case "monthly": return 30;
+    case "alltime": return 30;
+  }
+}
+
+function calcAmountSaved(totalCost: number, totalUsers: number, period: Period): number {
+  const days = getPeriodDays(period);
+  const maxPlanCost = totalUsers * CLAUDE_MAX_MONTHLY_COST * (days / 30);
+  return totalCost - maxPlanCost;
 }
 
 function StatCard({
@@ -48,7 +66,20 @@ function StatCard({
 
 export default function Home() {
   const [period, setPeriod] = useState<Period>("weekly");
-  const stats = useQuery(api.leaderboard.getStatsSummary, { period });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("ccusage_period");
+    if (saved && ["daily", "weekly", "monthly", "alltime"].includes(saved)) {
+      setPeriod(saved as Period);
+    }
+  }, []);
+
+  const handlePeriodChange = (p: Period) => {
+    setPeriod(p);
+    localStorage.setItem("ccusage_period", p);
+  };
+
+  const pageData = useQuery(api.leaderboard.getPageData, { period, limit: 100 });
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -92,29 +123,37 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <StatCard
             label="Total Tokens"
-            value={stats ? formatTokens(stats.totalTokens) : "--"}
+            value={pageData ? formatTokens(pageData.statsSummary.totalTokens) : "--"}
             subValue="across all users"
           />
           <StatCard
             label="Total Spent"
-            value={stats ? formatCost(stats.totalCost) : "--"}
+            value={pageData ? formatCost(pageData.statsSummary.totalCost) : "--"}
             subValue="in API costs"
           />
           <StatCard
-            label="Active Users"
-            value={stats ? stats.totalUsers.toString() : "--"}
-            subValue="tracking usage"
+            label="Amount Saved"
+            value={pageData ? formatCost(calcAmountSaved(pageData.statsSummary.totalCost, pageData.statsSummary.totalUsers, period)) : "--"}
+            subValue={`vs $200/mo Max plans (${pageData?.statsSummary.totalUsers ?? 0} users)`}
           />
         </div>
 
         {/* Tabs */}
         <div className="flex justify-center mb-6">
-          <LeaderboardTabs activePeriod={period} onPeriodChange={setPeriod} />
+          <LeaderboardTabs activePeriod={period} onPeriodChange={handlePeriodChange} />
+        </div>
+
+        {/* Member Usage Over Time */}
+        <div className="bg-white border border-[#e0e0e0] p-4 md:p-6 mb-6">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
+            Usage Over Time
+          </h3>
+          <MemberUsageChart period={period} />
         </div>
 
         {/* Leaderboard */}
         <div className="bg-white border border-[#e0e0e0] p-4 md:p-6">
-          <Leaderboard period={period} />
+          <Leaderboard period={period} data={pageData ? pageData.leaderboard : null} />
         </div>
       </main>
 

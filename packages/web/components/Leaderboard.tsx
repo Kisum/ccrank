@@ -4,8 +4,20 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Period } from "./LeaderboardTabs";
 
+interface LeaderboardEntry {
+  rank: number;
+  rankChange: number | "new" | null;
+  displayName: string | undefined;
+  slackUserId: string;
+  totalTokens: number;
+  totalCost: number;
+  hasReport?: boolean;
+  lastSyncedAt?: number | null;
+}
+
 interface LeaderboardProps {
   period: Period;
+  data?: LeaderboardEntry[] | null;
 }
 
 // Format large numbers (e.g., 2400000 -> "2.4M")
@@ -41,6 +53,22 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
+// Format relative time (e.g., "2h ago", "3d ago")
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 // Sanitize username to prevent XSS and ensure safe display
 function sanitizeUsername(username: string): string {
   // Only allow alphanumeric, hyphens, and underscores
@@ -54,6 +82,45 @@ function isValidGitHubUsername(username: string): boolean {
   // GitHub usernames: alphanumeric and hyphens, 1-39 chars, no consecutive hyphens
   const pattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
   return pattern.test(username) && !username.includes("--");
+}
+
+// Rank change indicator component
+function RankChangeIndicator({ rankChange }: { rankChange: number | "new" | null }) {
+  if (rankChange === null) return null;
+
+  if (rankChange === "new") {
+    return (
+      <span
+        className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+        style={{ backgroundColor: "#CCFF6F", color: "#1a1a1a" }}
+      >
+        NEW
+      </span>
+    );
+  }
+
+  if (rankChange > 0) {
+    return (
+      <span className="text-green-500 text-xs font-semibold whitespace-nowrap">
+        ▲ {rankChange}
+      </span>
+    );
+  }
+
+  if (rankChange < 0) {
+    return (
+      <span className="text-red-500 text-xs font-semibold whitespace-nowrap">
+        ▼ {Math.abs(rankChange)}
+      </span>
+    );
+  }
+
+  // rankChange === 0
+  return (
+    <span className="text-gray-400 text-xs font-semibold">
+      --
+    </span>
+  );
 }
 
 // Get rank display with medals for top 3
@@ -165,10 +232,13 @@ function LeaderboardContent({
   leaderboard:
     | {
         rank: number;
+        rankChange: number | "new" | null;
         displayName: string | undefined;
         slackUserId: string;
         totalTokens: number;
         totalCost: number;
+        hasReport?: boolean;
+        lastSyncedAt?: number | null;
       }[]
     | undefined;
 }) {
@@ -185,9 +255,11 @@ function LeaderboardContent({
       {/* Header row */}
       <div className="flex items-center gap-4 px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
         <div className="w-8 text-center">Rank</div>
+        {leaderboard[0]?.rankChange !== null && <div className="w-10 text-center"></div>}
         <div className="flex-1">User</div>
         <div className="w-24 text-right">Tokens</div>
         <div className="w-24 text-right">Cost</div>
+        <div className="w-20 text-right hidden sm:block">Synced</div>
       </div>
 
       {/* Leaderboard entries */}
@@ -212,21 +284,37 @@ function LeaderboardContent({
               {/* Rank */}
               <div className="flex-shrink-0">{getRankDisplay(entry.rank)}</div>
 
+              {/* Rank Change */}
+              {entry.rankChange !== null && (
+                <div className="w-10 flex-shrink-0 flex justify-center">
+                  <RankChangeIndicator rankChange={entry.rankChange} />
+                </div>
+              )}
+
               {/* Username */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 flex items-center gap-2">
                 {canLink ? (
                   <a
                     href={`https://github.com/${encodeURIComponent(username)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium truncate block hover:underline text-black"
+                    className="font-medium truncate hover:underline text-black"
                   >
                     @{username}
                   </a>
                 ) : (
-                  <span className="font-medium truncate block text-black">
+                  <span className="font-medium truncate text-black">
                     @{username}
                   </span>
+                )}
+                {entry.hasReport && (
+                  <a
+                    href={`/report/${encodeURIComponent(username.toLowerCase())}`}
+                    className="flex-shrink-0 px-2 py-0.5 text-[10px] font-bold bg-[#f5f5f5] border border-[#e0e0e0] hover:bg-[#CCFF6F] hover:border-[#CCFF6F] transition-colors text-gray-600 hover:text-black"
+                    title={`View ${username}'s insights report`}
+                  >
+                    REPORT
+                  </a>
                 )}
               </div>
 
@@ -243,6 +331,13 @@ function LeaderboardContent({
                   {formatCost(entry.totalCost)}
                 </span>
               </div>
+
+              {/* Last Synced */}
+              <div className="w-20 text-right hidden sm:block">
+                <span className="text-xs text-gray-400" title={entry.lastSyncedAt ? new Date(entry.lastSyncedAt).toLocaleString() : undefined}>
+                  {entry.lastSyncedAt ? formatRelativeTime(entry.lastSyncedAt) : "—"}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -251,7 +346,18 @@ function LeaderboardContent({
   );
 }
 
-export default function Leaderboard({ period }: LeaderboardProps) {
+export default function Leaderboard({ period, data }: LeaderboardProps) {
+  // Data provided by parent (from combined getPageData query)
+  if (data !== undefined) {
+    // null = parent query still loading
+    if (data === null) return <LoadingSkeleton />;
+    // empty array = no data for this period
+    if (data.length === 0) return <EmptyState />;
+    // render leaderboard directly without individual query
+    return <LeaderboardContent leaderboard={data} />;
+  }
+
+  // Standalone mode: query individually (fallback for Slack or other standalone usage)
   const limit = 100;
 
   switch (period) {

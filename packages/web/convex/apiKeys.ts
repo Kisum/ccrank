@@ -133,6 +133,54 @@ export const validateApiKey = query({
 });
 
 /**
+ * Validate an API key and return the associated user data in one call.
+ * Combines key validation + user lookup to avoid a redundant DB round-trip.
+ */
+export const validateApiKeyWithUser = query({
+  args: {
+    apiKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Remove the ccrank_ prefix if present
+    const keyValue = args.apiKey.startsWith("ccrank_")
+      ? args.apiKey.substring(7)
+      : args.apiKey;
+
+    // Hash the provided key
+    const encoder = new TextEncoder();
+    const data = encoder.encode(keyValue);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    // Look up the key by hash
+    const apiKey = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_hash", (q) => q.eq("keyHash", keyHash))
+      .first();
+
+    if (!apiKey || apiKey.revokedAt) {
+      return null;
+    }
+
+    // Also fetch the user in the same query
+    const user = await ctx.db.get(apiKey.userId);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      userId: apiKey.userId,
+      keyPrefix: apiKey.keyPrefix,
+      user: {
+        githubUsername: user.githubUsername,
+        displayName: user.displayName,
+      },
+    };
+  },
+});
+
+/**
  * Revoke an API key by its ID.
  */
 export const revokeApiKey = mutation({
